@@ -49,8 +49,9 @@ export const ntfyNotificationConfigSchema = type({
 	type: "'ntfy'",
 	serverUrl: "string?",
 	topic: "string",
-	token: "string?",
 	priority: "'max' | 'high' | 'default' | 'low' | 'min'",
+	username: "string?",
+	password: "string?",
 });
 
 export const pushoverNotificationConfigSchema = type({
