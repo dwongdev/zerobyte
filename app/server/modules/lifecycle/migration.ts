@@ -99,6 +99,11 @@ const migrateRepositoryFolders = async (): Promise<MigrationResult> => {
 
 		const config = repo.config as Extract<RepositoryConfig, { backend: "local" }>;
 
+		if (config.isExistingRepository) {
+			logger.debug(`Skipping imported repository "${repo.name}" - folder path is user-defined`);
+			continue;
+		}
+
 		if (config.name === repo.shortId) {
 			continue;
 		}

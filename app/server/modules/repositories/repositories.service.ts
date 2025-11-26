@@ -367,6 +367,15 @@ const updateRepository = async (name: string, updates: { name?: string; compress
 		throw new NotFoundError("Repository not found");
 	}
 
+	if (
+		updates.name !== undefined &&
+		updates.name !== existing.name &&
+		existing.config.backend === "local" &&
+		existing.config.isExistingRepository
+	) {
+		throw new ConflictError("Cannot rename an imported local repository");
+	}
+
 	let newName = existing.name;
 	if (updates.name !== undefined && updates.name !== existing.name) {
 		const newSlug = slugify(updates.name, { lower: true, strict: true });
