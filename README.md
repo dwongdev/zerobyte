@@ -18,9 +18,6 @@
 > [!WARNING]
 > Zerobyte is still in version 0.x.x and is subject to major changes from version to version. I am developing the core features and collecting feedbacks. Expect bugs! Please open issues or feature requests
 
-> [!WARNING]
-> It is highly discouraged to run Zerobyte on a server that is accessible from the internet (VPS or home server with port forwarding) If you do, make sure to change the port mapping to "127.0.0.1:4096:4096" and use a secure tunnel (SSH tunnel, Cloudflare Tunnel, etc.) to access the web interface remotely
-
 <p align="center">
 <a href="https://www.buymeacoffee.com/nicotsx" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 </p>
@@ -58,6 +55,9 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /var/lib/zerobyte:/var/lib/zerobyte
 ```
+
+> [!WARNING]
+> It is highly discouraged to run Zerobyte on a server that is accessible from the internet (VPS or home server with port forwarding) If you do, make sure to change the port mapping to "127.0.0.1:4096:4096" and use a secure tunnel (SSH tunnel, Cloudflare Tunnel, etc.) to access the web interface remotely
 
 > [!WARNING]
 > Do not try to point `/var/lib/zerobyte` on a network share. You will face permission issues and strong performance degradation.
