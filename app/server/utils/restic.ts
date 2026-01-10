@@ -851,8 +851,9 @@ const copy = async (
 	addCommonArgs(args, env, destConfig);
 
 	// Then explicitly apply source-side bandwidth limits for the from-repo operation
-	const sourceUploadLimit = formatBandwidthLimit(sourceConfig.uploadLimit);
-	const sourceDownloadLimit = formatBandwidthLimit(sourceConfig.downloadLimit);
+	// Guard the formatBandwidthLimit calls and compute values upfront
+	const sourceUploadLimit = sourceConfig.uploadLimit ? formatBandwidthLimit(sourceConfig.uploadLimit) : "";
+	const sourceDownloadLimit = sourceConfig.downloadLimit ? formatBandwidthLimit(sourceConfig.downloadLimit) : "";
 
 	// Determine effective limit for source (pick smaller numeric value if both exist)
 	let effectiveLimit = "";
@@ -870,11 +871,11 @@ const copy = async (
 			args.push("-o", `rclone.from.bwlimit=${effectiveLimit}`);
 		}
 	} else {
-		// For restic source backends, apply individual limits
-		if (sourceConfig.uploadLimit?.enabled && sourceUploadLimit) {
+		// For restic source backends, apply individual limits using the computed values
+		if (sourceUploadLimit) {
 			args.push("--limit-upload", sourceUploadLimit);
 		}
-		if (sourceConfig.downloadLimit?.enabled && sourceDownloadLimit) {
+		if (sourceDownloadLimit) {
 			args.push("--limit-download", sourceDownloadLimit);
 		}
 	}
@@ -906,8 +907,8 @@ const copy = async (
 };
 
 // Helper function to convert bandwidth limit to restic/rclone format
-const formatBandwidthLimit = (limit: BandwidthLimit): string => {
-	if (!limit.enabled || limit.value <= 0) {
+const formatBandwidthLimit = (limit?: BandwidthLimit): string => {
+	if (!limit || !limit.enabled || limit.value <= 0) {
 		return "";
 	}
 
@@ -971,18 +972,14 @@ export const addCommonArgs = (args: string[], env: Record<string, string>, confi
 			}
 		} else {
 			// For restic backends, handle upload and download limits separately
-			if (config.uploadLimit?.enabled) {
-				const uploadLimit = formatBandwidthLimit(config.uploadLimit);
-				if (uploadLimit) {
-					args.push("--limit-upload", uploadLimit);
-				}
+			const uploadLimit = formatBandwidthLimit(config.uploadLimit);
+			if (uploadLimit) {
+				args.push("--limit-upload", uploadLimit);
 			}
 
-			if (config.downloadLimit?.enabled) {
-				const downloadLimit = formatBandwidthLimit(config.downloadLimit);
-				if (downloadLimit) {
-					args.push("--limit-download", downloadLimit);
-				}
+			const downloadLimit = formatBandwidthLimit(config.downloadLimit);
+			if (downloadLimit) {
+				args.push("--limit-download", downloadLimit);
 			}
 		}
 	}
