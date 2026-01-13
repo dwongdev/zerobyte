@@ -51,10 +51,6 @@ export const AdvancedForm = ({ form }: Props) => {
 					<div className="grid gap-6 sm:grid-cols-2">
 						{/* Upload Limit */}
 						<div className="space-y-4 rounded-lg border bg-background/50 p-4">
-							<div className="flex items-center gap-2">
-								<h4 className="text-sm font-medium">Upload Limit</h4>
-							</div>
-
 							<FormField
 								control={form.control}
 								name="uploadLimit.enabled"
@@ -134,9 +130,6 @@ export const AdvancedForm = ({ form }: Props) => {
 
 						{/* Download Limit */}
 						<div className="space-y-4 rounded-lg border bg-background/50 p-4">
-							<div className="flex items-center gap-2">
-								<h4 className="text-sm font-medium">Download Limit</h4>
-							</div>
 
 							<FormField
 								control={form.control}
