@@ -75,14 +75,13 @@ bun run gen:api-client
 ### Code Quality
 
 ```bash
-# Format and lint (Biome)
-bunx biome check --write .
+# Format and lint
 
-# Format only
-bunx biome format --write .
+# Format
+bunx oxfmt format --write <path>
 
-# Lint only
-bunx biome lint .
+# Lint
+bun run lint
 ```
 
 ## Architecture
@@ -186,7 +185,6 @@ Zerobyte is a wrapper around Restic for backup operations. Key integration point
 
 - `buildRepoUrl()` - Constructs repository URLs for different backends
 - `buildEnv()` - Sets environment variables (credentials, cache dir)
-- `ensurePassfile()` - Manages encryption password file
 - Type-safe parsing of Restic JSON output using ArkType schemas
 
 **Rclone Integration** (`app/server/modules/repositories/`):

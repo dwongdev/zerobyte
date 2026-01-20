@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { throttle } from "es-toolkit";
 import { type } from "arktype";
+import { eq } from "drizzle-orm";
 import { REPOSITORY_BASE, RESTIC_PASS_FILE, DEFAULT_EXCLUDES, RESTIC_CACHE_DIR } from "../core/constants";
 import { config as appConfig } from "../core/config";
 import { logger } from "./logger";
@@ -12,6 +13,8 @@ import type { RetentionPolicy } from "../modules/backups/backups.dto";
 import { safeSpawn, exec } from "./spawn";
 import type { CompressionMode, RepositoryConfig, OverwriteMode, BandwidthLimit } from "~/schemas/restic";
 import { ResticError } from "./errors";
+import { db } from "../db/db";
+import { organization } from "../db/schema";
 
 const backupOutputSchema = type({
 	message_type: "'summary'",
@@ -61,17 +64,6 @@ const snapshotInfoSchema = type({
 	}).optional(),
 });
 
-const ensurePassfile = async () => {
-	await fs.mkdir(path.dirname(RESTIC_PASS_FILE), { recursive: true });
-
-	try {
-		await fs.access(RESTIC_PASS_FILE);
-	} catch {
-		logger.info("Restic passfile not found, creating a new one...");
-		await fs.writeFile(RESTIC_PASS_FILE, crypto.randomBytes(32).toString("hex"), { mode: 0o600 });
-	}
-};
-
 export const buildRepoUrl = (config: RepositoryConfig): string => {
 	switch (config.backend) {
 		case "local":
@@ -105,7 +97,7 @@ export const buildRepoUrl = (config: RepositoryConfig): string => {
 	}
 };
 
-export const buildEnv = async (config: RepositoryConfig) => {
+export const buildEnv = async (config: RepositoryConfig, organizationId: string) => {
 	const env: Record<string, string> = {
 		RESTIC_CACHE_DIR,
 		PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
@@ -118,7 +110,23 @@ export const buildEnv = async (config: RepositoryConfig) => {
 		await fs.writeFile(passwordFilePath, decryptedPassword, { mode: 0o600 });
 		env.RESTIC_PASSWORD_FILE = passwordFilePath;
 	} else {
-		env.RESTIC_PASSWORD_FILE = RESTIC_PASS_FILE;
+		const org = await db.query.organization.findFirst({
+			where: eq(organization.id, organizationId),
+		});
+
+		if (!org) {
+			throw new Error(`Organization ${organizationId} not found`);
+		}
+
+		const metadata = org.metadata;
+		if (!metadata?.resticPassword) {
+			throw new Error(`Restic password not configured for organization ${organizationId}`);
+		} else {
+			const decryptedPassword = await cryptoUtils.resolveSecret(metadata.resticPassword);
+			const passwordFilePath = path.join("/tmp", `zerobyte-pass-${crypto.randomBytes(8).toString("hex")}.txt`);
+			await fs.writeFile(passwordFilePath, decryptedPassword, { mode: 0o600 });
+			env.RESTIC_PASSWORD_FILE = passwordFilePath;
+		}
 	}
 
 	switch (config.backend) {
@@ -219,14 +227,12 @@ export const buildEnv = async (config: RepositoryConfig) => {
 	return env;
 };
 
-const init = async (config: RepositoryConfig) => {
-	await ensurePassfile();
-
+const init = async (config: RepositoryConfig, organizationId: string) => {
 	const repoUrl = buildRepoUrl(config);
 
 	logger.info(`Initializing restic repository at ${repoUrl}...`);
 
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, organizationId);
 
 	const args = ["init", "--repo", repoUrl];
 	addCommonArgs(args, env, config);
@@ -259,7 +265,8 @@ export type BackupProgress = typeof backupProgressSchema.infer;
 const backup = async (
 	config: RepositoryConfig,
 	source: string,
-	options?: {
+	options: {
+		organizationId: string;
 		exclude?: string[];
 		excludeIfPresent?: string[];
 		include?: string[];
@@ -271,7 +278,7 @@ const backup = async (
 	},
 ) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, options?.organizationId);
 
 	const args: string[] = ["--repo", repoUrl, "backup", "--compression", options?.compressionMode ?? "auto"];
 
@@ -410,7 +417,8 @@ const restore = async (
 	config: RepositoryConfig,
 	snapshotId: string,
 	target: string,
-	options?: {
+	options: {
+		organizationId: string;
 		include?: string[];
 		exclude?: string[];
 		excludeXattr?: string[];
@@ -419,7 +427,7 @@ const restore = async (
 	},
 ) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, options.organizationId);
 
 	const args: string[] = ["--repo", repoUrl, "restore", snapshotId, "--target", target];
 
@@ -493,11 +501,11 @@ const restore = async (
 	return result;
 };
 
-const snapshots = async (config: RepositoryConfig, options: { tags?: string[] } = {}) => {
-	const { tags } = options;
+const snapshots = async (config: RepositoryConfig, options: { tags?: string[]; organizationId: string }) => {
+	const { tags, organizationId } = options;
 
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, organizationId);
 
 	const args = ["--repo", repoUrl, "snapshots"];
 
@@ -527,9 +535,13 @@ const snapshots = async (config: RepositoryConfig, options: { tags?: string[] } 
 	return result;
 };
 
-const forget = async (config: RepositoryConfig, options: RetentionPolicy, extra: { tag: string }) => {
+const forget = async (
+	config: RepositoryConfig,
+	options: RetentionPolicy,
+	extra: { tag: string; organizationId: string },
+) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, extra.organizationId);
 
 	const args: string[] = ["--repo", repoUrl, "forget", "--group-by", "tags", "--tag", extra.tag];
 
@@ -569,9 +581,9 @@ const forget = async (config: RepositoryConfig, options: RetentionPolicy, extra:
 	return { success: true };
 };
 
-const deleteSnapshots = async (config: RepositoryConfig, snapshotIds: string[]) => {
+const deleteSnapshots = async (config: RepositoryConfig, snapshotIds: string[], organizationId: string) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, organizationId);
 
 	if (snapshotIds.length === 0) {
 		throw new Error("No snapshot IDs provided for deletion.");
@@ -591,17 +603,18 @@ const deleteSnapshots = async (config: RepositoryConfig, snapshotIds: string[]) 
 	return { success: true };
 };
 
-const deleteSnapshot = async (config: RepositoryConfig, snapshotId: string) => {
-	return deleteSnapshots(config, [snapshotId]);
+const deleteSnapshot = async (config: RepositoryConfig, snapshotId: string, organizationId: string) => {
+	return deleteSnapshots(config, [snapshotId], organizationId);
 };
 
 const tagSnapshots = async (
 	config: RepositoryConfig,
 	snapshotIds: string[],
 	tags: { add?: string[]; remove?: string[]; set?: string[] },
+	organizationId: string,
 ) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, organizationId);
 
 	if (snapshotIds.length === 0) {
 		throw new Error("No snapshot IDs provided for tagging.");
@@ -667,9 +680,9 @@ const lsSnapshotInfoSchema = type({
 	message_type: "'snapshot'",
 });
 
-const ls = async (config: RepositoryConfig, snapshotId: string, path?: string) => {
+const ls = async (config: RepositoryConfig, snapshotId: string, organizationId: string, path?: string) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, organizationId);
 
 	const args: string[] = ["--repo", repoUrl, "ls", snapshotId, "--long"];
 
@@ -723,9 +736,9 @@ const ls = async (config: RepositoryConfig, snapshotId: string, path?: string) =
 	return { snapshot, nodes };
 };
 
-const unlock = async (config: RepositoryConfig) => {
+const unlock = async (config: RepositoryConfig, organizationId: string) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, organizationId);
 
 	const args = ["unlock", "--repo", repoUrl, "--remove-all"];
 	addCommonArgs(args, env, config);
@@ -742,9 +755,9 @@ const unlock = async (config: RepositoryConfig) => {
 	return { success: true, message: "Repository unlocked successfully" };
 };
 
-const check = async (config: RepositoryConfig, options?: { readData?: boolean }) => {
+const check = async (config: RepositoryConfig, options: { readData?: boolean; organizationId: string }) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, options.organizationId);
 
 	const args: string[] = ["--repo", repoUrl, "check"];
 
@@ -780,9 +793,9 @@ const check = async (config: RepositoryConfig, options?: { readData?: boolean })
 	};
 };
 
-const repairIndex = async (config: RepositoryConfig) => {
+const repairIndex = async (config: RepositoryConfig, organizationId: string) => {
 	const repoUrl = buildRepoUrl(config);
-	const env = await buildEnv(config);
+	const env = await buildEnv(config, organizationId);
 
 	const args = ["repair", "index", "--repo", repoUrl];
 	addCommonArgs(args, env, config);
@@ -808,16 +821,13 @@ const repairIndex = async (config: RepositoryConfig) => {
 const copy = async (
 	sourceConfig: RepositoryConfig,
 	destConfig: RepositoryConfig,
-	options: {
-		tag?: string;
-		snapshotId?: string;
-	},
+	options: { organizationId: string; tag?: string; snapshotId?: string },
 ) => {
 	const sourceRepoUrl = buildRepoUrl(sourceConfig);
 	const destRepoUrl = buildRepoUrl(destConfig);
 
-	const sourceEnv = await buildEnv(sourceConfig);
-	const destEnv = await buildEnv(destConfig);
+	const sourceEnv = await buildEnv(sourceConfig, options.organizationId);
+	const destEnv = await buildEnv(destConfig, options.organizationId);
 
 	const env: Record<string, string> = {
 		...sourceEnv,
@@ -933,7 +943,6 @@ export const addCommonArgs = (
 };
 
 export const restic = {
-	ensurePassfile,
 	init,
 	backup,
 	restore,

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { RESTIC_PASS_FILE } from "../core/constants";
+import { config } from "../core/config";
 import { isNodeJSErrnoException } from "./fs";
 import { promisify } from "node:util";
 
@@ -84,7 +84,7 @@ const resolveFileSecret = async (ref: string): Promise<string> => {
 };
 
 /**
- * Given a string, encrypts it using a randomly generated salt.
+ * Given a string, encrypts it using a randomly generated salt and the APP_SECRET.
  * Returns the input unchanged if it's empty or already encrypted.
  */
 const encrypt = async (data: string) => {
@@ -96,10 +96,8 @@ const encrypt = async (data: string) => {
 		return data;
 	}
 
-	const secret = await Bun.file(RESTIC_PASS_FILE).text();
-
 	const salt = crypto.randomBytes(16);
-	const key = crypto.pbkdf2Sync(secret, salt, 100000, keyLength, "sha256");
+	const key = crypto.pbkdf2Sync(config.appSecret, salt, 100000, keyLength, "sha256");
 	const iv = crypto.randomBytes(12);
 
 	const cipher = crypto.createCipheriv(algorithm, key, iv);
@@ -110,7 +108,7 @@ const encrypt = async (data: string) => {
 };
 
 /**
- * Given an encrypted string, decrypts it using the salt stored in the string.
+ * Given an encrypted string, decrypts it using the salt stored in the string and the APP_SECRET.
  * Returns the input unchanged if it's not encrypted (for backward compatibility).
  */
 const decrypt = async (encryptedData: string) => {
@@ -118,13 +116,11 @@ const decrypt = async (encryptedData: string) => {
 		return encryptedData;
 	}
 
-	const secret = (await Bun.file(RESTIC_PASS_FILE).text()).trim();
-
 	const parts = encryptedData.split(":").slice(1); // Remove prefix
 	const saltHex = parts.shift() as string;
 	const salt = Buffer.from(saltHex, "hex");
 
-	const key = crypto.pbkdf2Sync(secret, salt, 100000, keyLength, "sha256");
+	const key = crypto.pbkdf2Sync(config.appSecret, salt, 100000, keyLength, "sha256");
 
 	const iv = Buffer.from(parts.shift() as string, "hex");
 	const encrypted = Buffer.from(parts.shift() as string, "hex");
@@ -187,15 +183,19 @@ const sealSecret = async (value: string): Promise<string> => {
 };
 
 async function deriveSecret(label: string) {
-	const masterSecret = await Bun.file(RESTIC_PASS_FILE).text();
-
-	const derivedKey = await hkdf("sha256", masterSecret, "", label, 32);
+	const derivedKey = await hkdf("sha256", config.appSecret, "", label, 32);
 
 	return Buffer.from(derivedKey).toString("hex");
+}
+
+function generateResticPassword(): string {
+	return crypto.randomBytes(32).toString("hex");
 }
 
 export const cryptoUtils = {
 	resolveSecret,
 	sealSecret,
 	deriveSecret,
+	generateResticPassword,
+	isEncrypted,
 };

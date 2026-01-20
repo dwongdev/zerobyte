@@ -18,6 +18,7 @@ import { logger } from "../../utils/logger";
 import { serverEvents } from "../../core/events";
 import { volumeConfigSchema, type BackendConfig } from "~/schemas/volumes";
 import { type } from "arktype";
+import { getOrganizationId } from "~/server/core/request-context";
 
 async function encryptSensitiveFields(config: BackendConfig): Promise<BackendConfig> {
 	switch (config.backend) {
@@ -43,16 +44,31 @@ async function encryptSensitiveFields(config: BackendConfig): Promise<BackendCon
 }
 
 const listVolumes = async () => {
-	const volumes = await db.query.volumesTable.findMany({});
+	const organizationId = getOrganizationId();
+	const volumes = await db.query.volumesTable.findMany({
+		where: eq(volumesTable.organizationId, organizationId),
+	});
 
 	return volumes;
 };
 
+const findVolume = async (idOrShortId: string | number) => {
+	const organizationId = getOrganizationId();
+	const isNumeric = typeof idOrShortId === "number" || /^\d+$/.test(String(idOrShortId));
+	return await db.query.volumesTable.findFirst({
+		where: and(
+			isNumeric ? eq(volumesTable.id, Number(idOrShortId)) : eq(volumesTable.shortId, idOrShortId),
+			eq(volumesTable.organizationId, organizationId),
+		),
+	});
+};
+
 const createVolume = async (name: string, backendConfig: BackendConfig) => {
+	const organizationId = getOrganizationId();
 	const slug = slugify(name, { lower: true, strict: true });
 
 	const existing = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, slug),
+		where: and(eq(volumesTable.name, slug), eq(volumesTable.organizationId, organizationId)),
 	});
 
 	if (existing) {
@@ -69,6 +85,7 @@ const createVolume = async (name: string, backendConfig: BackendConfig) => {
 			name: slug,
 			config: encryptedConfig,
 			type: backendConfig.backend,
+			organizationId,
 		})
 		.returning();
 
@@ -82,15 +99,14 @@ const createVolume = async (name: string, backendConfig: BackendConfig) => {
 	await db
 		.update(volumesTable)
 		.set({ status, lastError: error ?? null, lastHealthCheck: Date.now() })
-		.where(eq(volumesTable.name, slug));
+		.where(and(eq(volumesTable.id, created.id), eq(volumesTable.organizationId, organizationId)));
 
 	return { volume: created, status: 201 };
 };
 
-const deleteVolume = async (name: string) => {
-	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, name),
-	});
+const deleteVolume = async (idOrShortId: string | number) => {
+	const organizationId = getOrganizationId();
+	const volume = await findVolume(idOrShortId);
 
 	if (!volume) {
 		throw new NotFoundError("Volume not found");
@@ -98,13 +114,14 @@ const deleteVolume = async (name: string) => {
 
 	const backend = createVolumeBackend(volume);
 	await backend.unmount();
-	await db.delete(volumesTable).where(eq(volumesTable.name, name));
+	await db
+		.delete(volumesTable)
+		.where(and(eq(volumesTable.id, volume.id), eq(volumesTable.organizationId, organizationId)));
 };
 
-const mountVolume = async (name: string) => {
-	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, name),
-	});
+const mountVolume = async (idOrShortId: string | number) => {
+	const organizationId = getOrganizationId();
+	const volume = await findVolume(idOrShortId);
 
 	if (!volume) {
 		throw new NotFoundError("Volume not found");
@@ -116,19 +133,18 @@ const mountVolume = async (name: string) => {
 	await db
 		.update(volumesTable)
 		.set({ status, lastError: error ?? null, lastHealthCheck: Date.now() })
-		.where(eq(volumesTable.name, name));
+		.where(and(eq(volumesTable.id, volume.id), eq(volumesTable.organizationId, organizationId)));
 
 	if (status === "mounted") {
-		serverEvents.emit("volume:mounted", { volumeName: name });
+		serverEvents.emit("volume:mounted", { volumeName: volume.name });
 	}
 
 	return { error, status };
 };
 
-const unmountVolume = async (name: string) => {
-	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, name),
-	});
+const unmountVolume = async (idOrShortId: string | number) => {
+	const organizationId = getOrganizationId();
+	const volume = await findVolume(idOrShortId);
 
 	if (!volume) {
 		throw new NotFoundError("Volume not found");
@@ -137,19 +153,20 @@ const unmountVolume = async (name: string) => {
 	const backend = createVolumeBackend(volume);
 	const { status, error } = await backend.unmount();
 
-	await db.update(volumesTable).set({ status }).where(eq(volumesTable.name, name));
+	await db
+		.update(volumesTable)
+		.set({ status })
+		.where(and(eq(volumesTable.id, volume.id), eq(volumesTable.organizationId, organizationId)));
 
 	if (status === "unmounted") {
-		serverEvents.emit("volume:unmounted", { volumeName: name });
+		serverEvents.emit("volume:unmounted", { volumeName: volume.name });
 	}
 
 	return { error, status };
 };
 
-const getVolume = async (name: string) => {
-	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, name),
-	});
+const getVolume = async (idOrShortId: string | number) => {
+	const volume = await findVolume(idOrShortId);
 
 	if (!volume) {
 		throw new NotFoundError("Volume not found");
@@ -158,7 +175,7 @@ const getVolume = async (name: string) => {
 	let statfs: Partial<StatFs> = {};
 	if (volume.status === "mounted") {
 		statfs = await withTimeout(getStatFs(getVolumePath(volume)), 1000, "getStatFs").catch((error) => {
-			logger.warn(`Failed to get statfs for volume ${name}: ${toMessage(error)}`);
+			logger.warn(`Failed to get statfs for volume ${volume.name}: ${toMessage(error)}`);
 			return {};
 		});
 	}
@@ -166,10 +183,9 @@ const getVolume = async (name: string) => {
 	return { volume, statfs };
 };
 
-const updateVolume = async (name: string, volumeData: UpdateVolumeBody) => {
-	const existing = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, name),
-	});
+const updateVolume = async (idOrShortId: string | number, volumeData: UpdateVolumeBody) => {
+	const organizationId = getOrganizationId();
+	const existing = await findVolume(idOrShortId);
 
 	if (!existing) {
 		throw new NotFoundError("Volume not found");
@@ -180,7 +196,11 @@ const updateVolume = async (name: string, volumeData: UpdateVolumeBody) => {
 		const newSlug = slugify(volumeData.name, { lower: true, strict: true });
 
 		const conflict = await db.query.volumesTable.findFirst({
-			where: and(eq(volumesTable.name, newSlug), ne(volumesTable.id, existing.id)),
+			where: and(
+				eq(volumesTable.name, newSlug),
+				ne(volumesTable.id, existing.id),
+				eq(volumesTable.organizationId, organizationId),
+			),
 		});
 
 		if (conflict) {
@@ -215,7 +235,7 @@ const updateVolume = async (name: string, volumeData: UpdateVolumeBody) => {
 			autoRemount: volumeData.autoRemount,
 			updatedAt: Date.now(),
 		})
-		.where(eq(volumesTable.id, existing.id))
+		.where(and(eq(volumesTable.id, existing.id), eq(volumesTable.organizationId, organizationId)))
 		.returning();
 
 	if (!updated) {
@@ -228,7 +248,7 @@ const updateVolume = async (name: string, volumeData: UpdateVolumeBody) => {
 		await db
 			.update(volumesTable)
 			.set({ status, lastError: error ?? null, lastHealthCheck: Date.now() })
-			.where(eq(volumesTable.id, existing.id));
+			.where(and(eq(volumesTable.id, existing.id), eq(volumesTable.organizationId, organizationId)));
 
 		serverEvents.emit("volume:updated", { volumeName: updated.name });
 	}
@@ -252,6 +272,7 @@ const testConnection = async (backendConfig: BackendConfig) => {
 		status: "unmounted" as const,
 		lastError: null,
 		autoRemount: true,
+		organizationId: "test-org",
 	};
 
 	const backend = createVolumeBackend(mockVolume);
@@ -268,10 +289,9 @@ const testConnection = async (backendConfig: BackendConfig) => {
 	};
 };
 
-const checkHealth = async (name: string) => {
-	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, name),
-	});
+const checkHealth = async (idOrShortId: string | number) => {
+	const organizationId = getOrganizationId();
+	const volume = await findVolume(idOrShortId);
 
 	if (!volume) {
 		throw new NotFoundError("Volume not found");
@@ -281,21 +301,19 @@ const checkHealth = async (name: string) => {
 	const { error, status } = await backend.checkHealth();
 
 	if (status !== volume.status) {
-		serverEvents.emit("volume:status_changed", { volumeName: name, status });
+		serverEvents.emit("volume:status_changed", { volumeName: volume.name, status });
 	}
 
 	await db
 		.update(volumesTable)
 		.set({ lastHealthCheck: Date.now(), status, lastError: error ?? null })
-		.where(eq(volumesTable.name, volume.name));
+		.where(and(eq(volumesTable.id, volume.id), eq(volumesTable.organizationId, organizationId)));
 
 	return { status, error };
 };
 
-const listFiles = async (name: string, subPath?: string) => {
-	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.name, name),
-	});
+const listFiles = async (idOrShortId: string | number, subPath?: string) => {
+	const volume = await findVolume(idOrShortId);
 
 	if (!volume) {
 		throw new NotFoundError("Volume not found");

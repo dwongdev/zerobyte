@@ -16,6 +16,7 @@ import { repoMutex } from "../../core/repository-mutex";
 import { checkMirrorCompatibility, getIncompatibleMirrorError } from "~/server/utils/backend-compatibility";
 import path from "node:path";
 import { generateShortId } from "~/server/utils/id";
+import { getOrganizationId } from "~/server/core/request-context";
 
 const runningBackups = new Map<number, AbortController>();
 
@@ -57,7 +58,9 @@ const processPattern = (pattern: string, volumePath: string): string => {
 };
 
 const listSchedules = async () => {
+	const organizationId = getOrganizationId();
 	const schedules = await db.query.backupSchedulesTable.findMany({
+		where: eq(backupSchedulesTable.organizationId, organizationId),
 		with: {
 			volume: true,
 			repository: true,
@@ -68,8 +71,9 @@ const listSchedules = async () => {
 };
 
 const getSchedule = async (scheduleId: number) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 		with: {
 			volume: true,
 			repository: true,
@@ -84,12 +88,13 @@ const getSchedule = async (scheduleId: number) => {
 };
 
 const createSchedule = async (data: CreateBackupScheduleBody) => {
+	const organizationId = getOrganizationId();
 	if (!cron.validate(data.cronExpression)) {
 		throw new BadRequestError("Invalid cron expression");
 	}
 
 	const existingName = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.name, data.name),
+		where: and(eq(backupSchedulesTable.name, data.name), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (existingName) {
@@ -97,7 +102,7 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 	}
 
 	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.id, data.volumeId),
+		where: and(eq(volumesTable.id, data.volumeId), eq(volumesTable.organizationId, organizationId)),
 	});
 
 	if (!volume) {
@@ -105,7 +110,7 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 	}
 
 	const repository = await db.query.repositoriesTable.findFirst({
-		where: eq(repositoriesTable.id, data.repositoryId),
+		where: and(eq(repositoriesTable.id, data.repositoryId), eq(repositoriesTable.organizationId, organizationId)),
 	});
 
 	if (!repository) {
@@ -129,6 +134,7 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 			oneFileSystem: data.oneFileSystem,
 			nextBackupAt: nextBackupAt,
 			shortId: generateShortId(),
+			organizationId,
 		})
 		.returning();
 
@@ -140,8 +146,9 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 };
 
 const updateSchedule = async (scheduleId: number, data: UpdateBackupScheduleBody) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (!schedule) {
@@ -154,7 +161,7 @@ const updateSchedule = async (scheduleId: number, data: UpdateBackupScheduleBody
 
 	if (data.name) {
 		const existingName = await db.query.backupSchedulesTable.findFirst({
-			where: and(eq(backupSchedulesTable.name, data.name), ne(backupSchedulesTable.id, scheduleId)),
+			where: and(eq(backupSchedulesTable.name, data.name), ne(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 		});
 
 		if (existingName) {
@@ -163,7 +170,7 @@ const updateSchedule = async (scheduleId: number, data: UpdateBackupScheduleBody
 	}
 
 	const repository = await db.query.repositoriesTable.findFirst({
-		where: eq(repositoriesTable.id, data.repositoryId),
+		where: and(eq(repositoriesTable.id, data.repositoryId), eq(repositoriesTable.organizationId, organizationId)),
 	});
 
 	if (!repository) {
@@ -176,7 +183,7 @@ const updateSchedule = async (scheduleId: number, data: UpdateBackupScheduleBody
 	const [updated] = await db
 		.update(backupSchedulesTable)
 		.set({ ...data, nextBackupAt, updatedAt: Date.now() })
-		.where(eq(backupSchedulesTable.id, scheduleId))
+		.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)))
 		.returning();
 
 	if (!updated) {
@@ -187,20 +194,24 @@ const updateSchedule = async (scheduleId: number, data: UpdateBackupScheduleBody
 };
 
 const deleteSchedule = async (scheduleId: number) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (!schedule) {
 		throw new NotFoundError("Backup schedule not found");
 	}
 
-	await db.delete(backupSchedulesTable).where(eq(backupSchedulesTable.id, scheduleId));
+	await db
+		.delete(backupSchedulesTable)
+		.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)));
 };
 
 const executeBackup = async (scheduleId: number, manual = false) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (!schedule) {
@@ -218,7 +229,7 @@ const executeBackup = async (scheduleId: number, manual = false) => {
 	}
 
 	const volume = await db.query.volumesTable.findFirst({
-		where: eq(volumesTable.id, schedule.volumeId),
+		where: and(eq(volumesTable.id, schedule.volumeId), eq(volumesTable.organizationId, organizationId)),
 	});
 
 	if (!volume) {
@@ -226,7 +237,7 @@ const executeBackup = async (scheduleId: number, manual = false) => {
 	}
 
 	const repository = await db.query.repositoriesTable.findFirst({
-		where: eq(repositoriesTable.id, schedule.repositoryId),
+		where: and(eq(repositoriesTable.id, schedule.repositoryId), eq(repositoriesTable.organizationId, organizationId)),
 	});
 
 	if (!repository) {
@@ -265,7 +276,7 @@ const executeBackup = async (scheduleId: number, manual = false) => {
 			lastBackupError: null,
 			nextBackupAt,
 		})
-		.where(eq(backupSchedulesTable.id, scheduleId));
+		.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)));
 
 	const abortController = new AbortController();
 	runningBackups.set(scheduleId, abortController);
@@ -304,6 +315,7 @@ const executeBackup = async (scheduleId: number, manual = false) => {
 			const result = await restic.backup(repository.config, volumePath, {
 				...backupOptions,
 				compressionMode: repository.compressionMode ?? "auto",
+				organizationId,
 				onProgress: (progress) => {
 					serverEvents.emit("backup:progress", {
 						scheduleId,
@@ -342,7 +354,7 @@ const executeBackup = async (scheduleId: number, manual = false) => {
 				nextBackupAt: nextBackupAt,
 				updatedAt: Date.now(),
 			})
-			.where(eq(backupSchedulesTable.id, scheduleId));
+			.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)));
 
 		if (finalStatus === "warning") {
 			logger.warn(
@@ -383,7 +395,7 @@ const executeBackup = async (scheduleId: number, manual = false) => {
 				lastBackupError: toMessage(error),
 				updatedAt: Date.now(),
 			})
-			.where(eq(backupSchedulesTable.id, scheduleId));
+			.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)));
 
 		serverEvents.emit("backup:completed", {
 			scheduleId,
@@ -408,11 +420,13 @@ const executeBackup = async (scheduleId: number, manual = false) => {
 };
 
 const getSchedulesToExecute = async () => {
+	const organizationId = getOrganizationId();
 	const now = Date.now();
 	const schedules = await db.query.backupSchedulesTable.findMany({
 		where: and(
 			eq(backupSchedulesTable.enabled, true),
 			or(ne(backupSchedulesTable.lastBackupStatus, "in_progress"), isNull(backupSchedulesTable.lastBackupStatus)),
+			eq(backupSchedulesTable.organizationId, organizationId),
 		),
 	});
 
@@ -428,8 +442,9 @@ const getSchedulesToExecute = async () => {
 };
 
 const getScheduleForVolume = async (volumeId: number) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.volumeId, volumeId),
+		where: and(eq(backupSchedulesTable.volumeId, volumeId), eq(backupSchedulesTable.organizationId, organizationId)),
 		with: { volume: true, repository: true },
 	});
 
@@ -437,8 +452,9 @@ const getScheduleForVolume = async (volumeId: number) => {
 };
 
 const stopBackup = async (scheduleId: number) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (!schedule) {
@@ -462,13 +478,14 @@ const stopBackup = async (scheduleId: number) => {
 				lastBackupError: "Backup was stopped by user",
 				updatedAt: Date.now(),
 			})
-			.where(eq(backupSchedulesTable.id, scheduleId));
+			.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)));
 	}
 };
 
 const runForget = async (scheduleId: number, repositoryId?: string) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (!schedule) {
@@ -480,7 +497,7 @@ const runForget = async (scheduleId: number, repositoryId?: string) => {
 	}
 
 	const repository = await db.query.repositoriesTable.findFirst({
-		where: eq(repositoriesTable.id, repositoryId ?? schedule.repositoryId),
+		where: and(eq(repositoriesTable.id, repositoryId ?? schedule.repositoryId), eq(repositoriesTable.organizationId, organizationId)),
 	});
 
 	if (!repository) {
@@ -490,7 +507,7 @@ const runForget = async (scheduleId: number, repositoryId?: string) => {
 	logger.info(`running retention policy (forget) for schedule ${scheduleId}`);
 	const releaseLock = await repoMutex.acquireExclusive(repository.id, `forget:${scheduleId}`);
 	try {
-		await restic.forget(repository.config, schedule.retentionPolicy, { tag: schedule.shortId });
+		await restic.forget(repository.config, schedule.retentionPolicy, { tag: schedule.shortId, organizationId });
 		cache.delByPrefix(`snapshots:${repository.id}:`);
 	} finally {
 		releaseLock();
@@ -500,8 +517,9 @@ const runForget = async (scheduleId: number, repositoryId?: string) => {
 };
 
 const getMirrors = async (scheduleId: number) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (!schedule) {
@@ -517,8 +535,9 @@ const getMirrors = async (scheduleId: number) => {
 };
 
 const updateMirrors = async (scheduleId: number, data: UpdateScheduleMirrorsBody) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 		with: { repository: true },
 	});
 
@@ -532,7 +551,7 @@ const updateMirrors = async (scheduleId: number, data: UpdateScheduleMirrorsBody
 		}
 
 		const repo = await db.query.repositoriesTable.findFirst({
-			where: eq(repositoriesTable.id, mirror.repositoryId),
+			where: and(eq(repositoriesTable.id, mirror.repositoryId), eq(repositoriesTable.organizationId, organizationId)),
 		});
 
 		if (!repo) {
@@ -585,8 +604,9 @@ const copyToMirrors = async (
 	sourceRepository: { id: string; config: (typeof repositoriesTable.$inferSelect)["config"] },
 	retentionPolicy: (typeof backupSchedulesTable.$inferSelect)["retentionPolicy"],
 ) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 	});
 
 	if (!schedule) {
@@ -622,7 +642,7 @@ const copyToMirrors = async (
 			const releaseMirror = await repoMutex.acquireShared(mirror.repository.id, `mirror:${scheduleId}`);
 
 			try {
-				await restic.copy(sourceRepository.config, mirror.repository.config, { tag: schedule.shortId });
+				await restic.copy(sourceRepository.config, mirror.repository.config, { tag: schedule.shortId, organizationId });
 				cache.delByPrefix(`snapshots:${mirror.repository.id}:`);
 			} finally {
 				releaseSource();
@@ -671,8 +691,9 @@ const copyToMirrors = async (
 };
 
 const getMirrorCompatibility = async (scheduleId: number) => {
+	const organizationId = getOrganizationId();
 	const schedule = await db.query.backupSchedulesTable.findFirst({
-		where: eq(backupSchedulesTable.id, scheduleId),
+		where: and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)),
 		with: { repository: true },
 	});
 
@@ -680,7 +701,9 @@ const getMirrorCompatibility = async (scheduleId: number) => {
 		throw new NotFoundError("Backup schedule not found");
 	}
 
-	const allRepositories = await db.query.repositoriesTable.findMany();
+	const allRepositories = await db.query.repositoriesTable.findMany({
+		where: eq(repositoriesTable.organizationId, organizationId),
+	});
 	const repos = allRepositories.filter((repo) => repo.id !== schedule.repositoryId);
 
 	const compatibility = await Promise.all(
@@ -691,12 +714,14 @@ const getMirrorCompatibility = async (scheduleId: number) => {
 };
 
 const reorderSchedules = async (scheduleIds: number[]) => {
+	const organizationId = getOrganizationId();
 	const uniqueIds = new Set(scheduleIds);
 	if (uniqueIds.size !== scheduleIds.length) {
 		throw new BadRequestError("Duplicate schedule IDs in reorder request");
 	}
 
 	const existingSchedules = await db.query.backupSchedulesTable.findMany({
+		where: eq(backupSchedulesTable.organizationId, organizationId),
 		columns: { id: true },
 	});
 	const existingIds = new Set(existingSchedules.map((s) => s.id));
@@ -714,7 +739,7 @@ const reorderSchedules = async (scheduleIds: number[]) => {
 				tx
 					.update(backupSchedulesTable)
 					.set({ sortOrder: index, updatedAt: now })
-					.where(eq(backupSchedulesTable.id, scheduleId)),
+					.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId))),
 			),
 		);
 	});

@@ -7,6 +7,8 @@ import { generateBackupOutput } from "~/test/helpers/restic";
 import { getVolumePath } from "../../volumes/helpers";
 import { restic } from "~/server/utils/restic";
 import path from "node:path";
+import { TEST_ORG_ID } from "~/test/helpers/organization";
+import * as context from "~/server/core/request-context";
 
 const backupMock = mock(() => Promise.resolve({ exitCode: 0, result: JSON.parse(generateBackupOutput()) }));
 
@@ -14,6 +16,7 @@ beforeEach(() => {
 	backupMock.mockClear();
 	spyOn(restic, "backup").mockImplementation(backupMock);
 	spyOn(restic, "forget").mockImplementation(mock(() => Promise.resolve({ success: true })));
+	spyOn(context, "getOrganizationId").mockReturnValue(TEST_ORG_ID);
 });
 
 afterEach(() => {

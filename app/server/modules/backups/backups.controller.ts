@@ -52,7 +52,6 @@ export const backupScheduleController = new Hono()
 	})
 	.get("/:scheduleId", getBackupScheduleDto, async (c) => {
 		const scheduleId = c.req.param("scheduleId");
-
 		const schedule = await backupsService.getSchedule(Number(scheduleId));
 
 		return c.json<GetBackupScheduleDto>(schedule, 200);
@@ -65,7 +64,6 @@ export const backupScheduleController = new Hono()
 	})
 	.post("/", createBackupScheduleDto, validator("json", createBackupScheduleBody), async (c) => {
 		const body = c.req.valid("json");
-
 		const schedule = await backupsService.createSchedule(body);
 
 		return c.json<CreateBackupScheduleDto>(schedule, 201);
@@ -73,21 +71,18 @@ export const backupScheduleController = new Hono()
 	.patch("/:scheduleId", updateBackupScheduleDto, validator("json", updateBackupScheduleBody), async (c) => {
 		const scheduleId = c.req.param("scheduleId");
 		const body = c.req.valid("json");
-
 		const schedule = await backupsService.updateSchedule(Number(scheduleId), body);
 
 		return c.json<UpdateBackupScheduleDto>(schedule, 200);
 	})
 	.delete("/:scheduleId", deleteBackupScheduleDto, async (c) => {
 		const scheduleId = c.req.param("scheduleId");
-
 		await backupsService.deleteSchedule(Number(scheduleId));
 
 		return c.json<DeleteBackupScheduleDto>({ success: true }, 200);
 	})
 	.post("/:scheduleId/run", runBackupNowDto, async (c) => {
 		const scheduleId = c.req.param("scheduleId");
-
 		backupsService.executeBackup(Number(scheduleId), true).catch((err) => {
 			console.error(`Error executing manual backup for schedule ${scheduleId}:`, err);
 		});
@@ -96,14 +91,12 @@ export const backupScheduleController = new Hono()
 	})
 	.post("/:scheduleId/stop", stopBackupDto, async (c) => {
 		const scheduleId = c.req.param("scheduleId");
-
 		await backupsService.stopBackup(Number(scheduleId));
 
 		return c.json<StopBackupDto>({ success: true }, 200);
 	})
 	.post("/:scheduleId/forget", runForgetDto, async (c) => {
 		const scheduleId = c.req.param("scheduleId");
-
 		await backupsService.runForget(Number(scheduleId));
 
 		return c.json<RunForgetDto>({ success: true }, 200);
@@ -147,7 +140,6 @@ export const backupScheduleController = new Hono()
 	})
 	.post("/reorder", reorderBackupSchedulesDto, validator("json", reorderBackupSchedulesBody), async (c) => {
 		const body = c.req.valid("json");
-
 		await backupsService.reorderSchedules(body.scheduleIds);
 
 		return c.json<ReorderBackupSchedulesDto>({ success: true }, 200);

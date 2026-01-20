@@ -6,12 +6,15 @@ import { createTestRepository } from "~/test/helpers/repository";
 import { generateBackupOutput } from "~/test/helpers/restic";
 import { faker } from "@faker-js/faker";
 import * as spawnModule from "~/server/utils/spawn";
+import { TEST_ORG_ID } from "~/test/helpers/organization";
+import * as context from "~/server/core/request-context";
 
 const resticBackupMock = mock(() => Promise.resolve({ exitCode: 0, summary: "", error: "" }));
 
 beforeEach(() => {
 	resticBackupMock.mockClear();
 	spyOn(spawnModule, "safeSpawn").mockImplementation(resticBackupMock);
+	spyOn(context, "getOrganizationId").mockReturnValue(TEST_ORG_ID);
 });
 
 afterEach(() => {

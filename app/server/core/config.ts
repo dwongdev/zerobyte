@@ -34,6 +34,7 @@ const envSchema = type({
 	APP_VERSION: "string = 'dev'",
 	TRUSTED_ORIGINS: "string?",
 	DISABLE_RATE_LIMITING: 'string = "false"',
+	APP_SECRET: "32 <= string <= 256",
 }).pipe((s) => ({
 	__prod__: s.NODE_ENV === "production",
 	environment: s.NODE_ENV,
@@ -45,13 +46,35 @@ const envSchema = type({
 	appVersion: s.APP_VERSION,
 	trustedOrigins: s.TRUSTED_ORIGINS?.split(",").map((origin) => origin.trim()),
 	disableRateLimiting: s.DISABLE_RATE_LIMITING === "true",
+	appSecret: s.APP_SECRET,
 }));
 
 const parseConfig = (env: unknown) => {
 	const result = envSchema(env);
 
 	if (result instanceof type.errors) {
-		console.error(`Environment variable validation failed: ${result.toString()}`);
+		if (!process.env.APP_SECRET) {
+			const errorMessage = [
+				"",
+				"================================================================================",
+				"APP_SECRET is not configured.",
+				"",
+				"This secret is required for encrypting sensitive data in the database.",
+				"",
+				"To generate a new secret, run:",
+				"  openssl rand -hex 32",
+				"",
+				"Then set the APP_SECRET environment variable with the generated value.",
+				"",
+				"IMPORTANT: Store this secret securely and back it up. If lost, encrypted data",
+				"in the database will be unrecoverable.",
+				"================================================================================",
+				"",
+			].join("\n");
+
+			console.error(errorMessage);
+		}
+		console.error(`Environment variable validation failed: ${result.summary}`);
 		throw new Error("Invalid environment variables");
 	}
 

@@ -6,12 +6,15 @@ import {
 	type MiddlewareOptions,
 } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { createAuthMiddleware, twoFactor, username } from "better-auth/plugins";
+import { admin, createAuthMiddleware, twoFactor, username, organization } from "better-auth/plugins";
+import { UnauthorizedError } from "http-errors-enhanced";
 import { convertLegacyUserOnFirstLogin } from "./auth-middlewares/convert-legacy-user";
-import { cryptoUtils } from "~/server/utils/crypto";
-import { db } from "~/server/db/db";
+import { eq } from "drizzle-orm";
+import { config } from "../server/core/config";
+import { db } from "../server/db/db";
+import { cryptoUtils } from "../server/utils/crypto";
+import { organization as organizationTable, member, usersTable } from "../server/db/schema";
 import { ensureOnlyOneUser } from "./auth-middlewares/only-one-user";
-import { config } from "~/server/core/config";
 
 export type AuthMiddlewareContext = MiddlewareContext<MiddlewareOptions, AuthContext<BetterAuthOptions>>;
 
@@ -19,6 +22,9 @@ const createBetterAuth = (secret: string) =>
 	betterAuth({
 		secret,
 		trustedOrigins: config.trustedOrigins ?? ["*"],
+		onAPIError: {
+			throw: true,
+		},
 		hooks: {
 			before: createAuthMiddleware(async (ctx) => {
 				await ensureOnlyOneUser(ctx);
@@ -28,6 +34,76 @@ const createBetterAuth = (secret: string) =>
 		database: drizzleAdapter(db, {
 			provider: "sqlite",
 		}),
+		databaseHooks: {
+			user: {
+				create: {
+					before: async (user) => {
+						const anyUser = await db.query.usersTable.findFirst();
+						const isFirstUser = !anyUser;
+
+						if (isFirstUser) {
+							user.role = "admin";
+						}
+
+						return { data: user };
+					},
+					after: async (user) => {
+						const slug = user.email.split("@")[0] + "-" + Math.random().toString(36).slice(-4);
+
+						const resticPassword = cryptoUtils.generateResticPassword();
+						const metadata = {
+							resticPassword: await cryptoUtils.sealSecret(resticPassword),
+						};
+
+						try {
+							await db.transaction(async (tx) => {
+								const orgId = Bun.randomUUIDv7();
+
+								await tx.insert(organizationTable).values({
+									name: `${user.name}'s Workspace`,
+									slug: slug,
+									id: orgId,
+									createdAt: new Date(),
+									metadata,
+								});
+
+								await tx.insert(member).values({
+									id: Bun.randomUUIDv7(),
+									userId: user.id,
+									role: "owner",
+									organizationId: orgId,
+									createdAt: new Date(),
+								});
+							});
+						} catch {
+							await db.delete(usersTable).where(eq(usersTable.id, user.id));
+
+							throw new Error(`Failed to create organization for user ${user.id}`);
+						}
+					},
+				},
+			},
+			session: {
+				create: {
+					before: async (session) => {
+						const orgMembership = await db.query.member.findFirst({
+							where: eq(member.userId, session.userId),
+						});
+
+						if (!orgMembership) {
+							throw new UnauthorizedError("User does not belong to any organization");
+						}
+
+						return {
+							data: {
+								...session,
+								activeOrganizationId: orgMembership?.organizationId,
+							},
+						};
+					},
+				},
+			},
+		},
 		emailAndPassword: {
 			enabled: true,
 		},
@@ -50,6 +126,12 @@ const createBetterAuth = (secret: string) =>
 		},
 		plugins: [
 			username(),
+			admin({
+				defaultRole: "user",
+			}),
+			organization({
+				allowUserToCreateOrganization: false,
+			}),
 			twoFactor({
 				backupCodeOptions: {
 					storeBackupCodes: "encrypted",

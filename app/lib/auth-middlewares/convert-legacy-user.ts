@@ -3,6 +3,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { db } from "~/server/db/db";
 import { account, usersTable } from "~/server/db/schema";
 import type { AuthMiddlewareContext } from "../auth";
+import { UnauthorizedError } from "http-errors-enhanced";
 
 export const convertLegacyUserOnFirstLogin = async (ctx: AuthMiddlewareContext) => {
 	const { path, body } = ctx;
@@ -32,6 +33,7 @@ export const convertLegacyUserOnFirstLogin = async (ctx: AuthMiddlewareContext) 
 					name: legacyUser.name,
 					hasDownloadedResticPassword: legacyUser.hasDownloadedResticPassword,
 					emailVerified: false,
+					role: "admin", // In legacy system, the only user is an admin
 				});
 
 				await tx.insert(account).values({
@@ -44,7 +46,7 @@ export const convertLegacyUserOnFirstLogin = async (ctx: AuthMiddlewareContext) 
 				});
 			});
 		} else {
-			throw new Error("Invalid credentials");
+			throw new UnauthorizedError("Invalid credentials");
 		}
 	}
 };

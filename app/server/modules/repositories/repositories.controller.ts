@@ -82,7 +82,6 @@ export const repositoriesController = new Hono()
 	.get("/:id/snapshots", listSnapshotsDto, validator("query", listSnapshotsFilters), async (c) => {
 		const { id } = c.req.param();
 		const { backupId } = c.req.valid("query");
-
 		const res = await repositoriesService.listSnapshots(id, backupId);
 
 		const snapshots = res.map((snapshot) => {
@@ -147,21 +146,18 @@ export const repositoriesController = new Hono()
 	.post("/:id/restore", restoreSnapshotDto, validator("json", restoreSnapshotBody), async (c) => {
 		const { id } = c.req.param();
 		const { snapshotId, ...options } = c.req.valid("json");
-
 		const result = await repositoriesService.restoreSnapshot(id, snapshotId, options);
 
 		return c.json<RestoreSnapshotDto>(result, 200);
 	})
 	.post("/:id/doctor", doctorRepositoryDto, async (c) => {
 		const { id } = c.req.param();
-
 		const result = await repositoriesService.doctorRepository(id);
 
 		return c.json<DoctorRepositoryDto>(result, 200);
 	})
 	.delete("/:id/snapshots/:snapshotId", deleteSnapshotDto, async (c) => {
 		const { id, snapshotId } = c.req.param();
-
 		await repositoriesService.deleteSnapshot(id, snapshotId);
 
 		return c.json<DeleteSnapshotDto>({ message: "Snapshot deleted" }, 200);
@@ -169,7 +165,6 @@ export const repositoriesController = new Hono()
 	.delete("/:id/snapshots", deleteSnapshotsDto, validator("json", deleteSnapshotsBody), async (c) => {
 		const { id } = c.req.param();
 		const { snapshotIds } = c.req.valid("json");
-
 		await repositoriesService.deleteSnapshots(id, snapshotIds);
 
 		return c.json<DeleteSnapshotsResponseDto>({ message: "Snapshots deleted" }, 200);
@@ -177,7 +172,6 @@ export const repositoriesController = new Hono()
 	.post("/:id/snapshots/tag", tagSnapshotsDto, validator("json", tagSnapshotsBody), async (c) => {
 		const { id } = c.req.param();
 		const { snapshotIds, ...tags } = c.req.valid("json");
-
 		await repositoriesService.tagSnapshots(id, snapshotIds, tags);
 
 		return c.json<TagSnapshotsResponseDto>({ message: "Snapshots tagged" }, 200);
@@ -185,7 +179,6 @@ export const repositoriesController = new Hono()
 	.patch("/:id", updateRepositoryDto, validator("json", updateRepositoryBody), async (c) => {
 		const { id } = c.req.param();
 		const body = c.req.valid("json");
-
 		const res = await repositoriesService.updateRepository(id, body);
 
 		return c.json<UpdateRepositoryDto>(res.repository, 200);
