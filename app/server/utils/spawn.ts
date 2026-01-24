@@ -53,6 +53,7 @@ export const safeSpawn = (params: SafeSpawnParams) => {
 		const child = spawn(command, args, {
 			env: { ...process.env, ...env },
 			signal: signal,
+			stdio: ["ignore", "pipe", "pipe"],
 		});
 
 		child.stdout.setEncoding("utf8");

@@ -120,7 +120,7 @@ const createRepository = async (name: string, config: RepositoryConfig, compress
 
 		error = result.error;
 	} else {
-		const initResult = await restic.init(encryptedConfig, organizationId);
+		const initResult = await restic.init(encryptedConfig, organizationId, { timeoutMs: 20000 });
 		error = initResult.error;
 	}
 

@@ -185,11 +185,27 @@ export const buildEnv = async (config: RepositoryConfig, organizationId: string)
 
 			const sshArgs = [
 				"-o",
-				"LogLevel=VERBOSE",
+				"LogLevel=ERROR",
 				"-o",
-				"ServerAliveInterval=60",
+				"BatchMode=yes",
 				"-o",
-				"ServerAliveCountMax=240",
+				"NumberOfPasswordPrompts=0",
+				"-o",
+				"PreferredAuthentications=publickey",
+				"-o",
+				"PasswordAuthentication=no",
+				"-o",
+				"KbdInteractiveAuthentication=no",
+				"-o",
+				"IdentitiesOnly=yes",
+				"-o",
+				"ConnectTimeout=10",
+				"-o",
+				"ConnectionAttempts=1",
+				"-o",
+				"ServerAliveInterval=10",
+				"-o",
+				"ServerAliveCountMax=3",
 				"-i",
 				keyPath,
 			];
@@ -227,7 +243,7 @@ export const buildEnv = async (config: RepositoryConfig, organizationId: string)
 	return env;
 };
 
-const init = async (config: RepositoryConfig, organizationId: string) => {
+const init = async (config: RepositoryConfig, organizationId: string, options?: { timeoutMs?: number }) => {
 	const repoUrl = buildRepoUrl(config);
 
 	logger.info(`Initializing restic repository at ${repoUrl}...`);
@@ -237,7 +253,7 @@ const init = async (config: RepositoryConfig, organizationId: string) => {
 	const args = ["init", "--repo", repoUrl];
 	addCommonArgs(args, env, config);
 
-	const res = await exec({ command: "restic", args, env });
+	const res = await exec({ command: "restic", args, env, timeout: options?.timeoutMs ?? 20000 });
 	await cleanupTemporaryKeys(env);
 
 	if (res.exitCode !== 0) {
