@@ -295,7 +295,7 @@ describe("multi-organization isolation", () => {
 				name: "Org 1 Destination",
 				enabled: true,
 				type: "discord",
-				config: { type: "discord", url: "https://example.com/webhook" },
+				config: { type: "discord", webhookUrl: "https://example.com/webhook" },
 				organizationId: session1.organizationId,
 			})
 			.returning();
