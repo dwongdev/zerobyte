@@ -22,7 +22,10 @@ export type AuthMiddlewareContext = MiddlewareContext<MiddlewareOptions, AuthCon
 const createBetterAuth = (secret: string) =>
 	betterAuth({
 		secret,
-		trustedOrigins: config.trustedOrigins ?? ["*"],
+		trustedOrigins: config.trustedOrigins,
+		advanced: {
+			disableOriginCheck: !config.trustedOrigins,
+		},
 		onAPIError: {
 			throw: true,
 		},
