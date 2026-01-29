@@ -197,5 +197,4 @@ export const v00002 = {
 	execute,
 	id: "00002-isolate-restic-passwords",
 	type: "critical" as const,
-	dependsOn: ["00001-retag-snapshots"],
 };
