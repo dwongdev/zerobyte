@@ -66,11 +66,13 @@ services:
 
 > [!NOTE]
 > **TrueNAS Users:** The host path `/var/lib` is ephemeral on TrueNAS and will be reset during system upgrades. Instead of using `/var/lib/zerobyte:/var/lib/zerobyte`, create a dedicated ZFS dataset (e.g., `tank/docker/zerobyte`) and mount it instead:
+>
 > ```yaml
 > volumes:
 >   - /etc/localtime:/etc/localtime:ro
 >   - /mnt/tank/docker/zerobyte:/var/lib/zerobyte
 > ```
+>
 > This ensures your configuration, encryption keys, and database persist across TrueNAS upgrades.
 
 Then, run the following command to start Zerobyte:
@@ -87,16 +89,16 @@ Zerobyte can be customized using environment variables. Below are the available 
 
 ### Environment Variables
 
-| Variable              | Description                                                                                                                         | Default    |
-| :-------------------- | :---------------------------------------------------------------------------------------------------------------------------------- | :--------- |
-| `BASE_URL`            | The base URL of your Zerobyte instance (e.g., `https://zerobyte.example.com`). See [Authentication](#authentication) below.         | (none)     |
-| `APP_SECRET`          | **Required.** A random secret key (32+ chars) used to encrypt sensitive data in the database. Generate with `openssl rand -hex 32`. | (none)     |
-| `PORT`                | The port the web interface and API will listen on.                                                                                  | `4096`     |
-| `RESTIC_HOSTNAME`     | The hostname used by Restic when creating snapshots. Automatically detected if a custom hostname is set in Docker.                  | `zerobyte` |
-| `TZ`                  | Timezone for the container (e.g., `Europe/Paris`). **Crucial for accurate backup scheduling.**                                      | `UTC`      |
-| `TRUSTED_ORIGINS`     | Comma-separated list of extra trusted origins for CORS (e.g., `http://localhost:3000,http://example.com`).                          | (none)     |
-| `LOG_LEVEL`           | Logging verbosity. Options: `debug`, `info`, `warn`, `error`.                                                                       | `info`     |
-| `SERVER_IDLE_TIMEOUT` | Idle timeout for the server in seconds.                                                                                             | `60`       |
+| Variable              | Description                                                                                                                               | Default    |
+| :-------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
+| `BASE_URL`            | **Required.** The base URL of your Zerobyte instance (e.g., `https://zerobyte.example.com`). See [Authentication](#authentication) below. | (none)     |
+| `APP_SECRET`          | **Required.** A random secret key (32+ chars) used to encrypt sensitive data in the database. Generate with `openssl rand -hex 32`.       | (none)     |
+| `PORT`                | The port the web interface and API will listen on.                                                                                        | `4096`     |
+| `RESTIC_HOSTNAME`     | The hostname used by Restic when creating snapshots. Automatically detected if a custom hostname is set in Docker.                        | `zerobyte` |
+| `TZ`                  | Timezone for the container (e.g., `Europe/Paris`). **Crucial for accurate backup scheduling.**                                            | `UTC`      |
+| `TRUSTED_ORIGINS`     | Comma-separated list of extra trusted origins for CORS (e.g., `http://localhost:3000,http://example.com`).                                | (none)     |
+| `LOG_LEVEL`           | Logging verbosity. Options: `debug`, `info`, `warn`, `error`.                                                                             | `info`     |
+| `SERVER_IDLE_TIMEOUT` | Idle timeout for the server in seconds.                                                                                                   | `60`       |
 
 ### Secret References
 
