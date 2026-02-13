@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { ChevronDown, FileIcon, FolderOpen, RotateCcw } from "lucide-react";
 import { Button } from "~/client/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/client/components/ui/card";
-import { Checkbox } from "~/client/components/ui/checkbox";
 import { Input } from "~/client/components/ui/input";
 import { Label } from "~/client/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/client/components/ui/select";

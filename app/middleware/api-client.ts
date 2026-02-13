@@ -6,7 +6,7 @@ import {
 } from "~/lib/request-client";
 import { config } from "../server/core/config";
 
-export const apiClientMiddleware = createMiddleware().server(async ({ next, request }) => {
+export const apiClientMiddleware = createMiddleware().server(async ({ next }) => {
 	const client = createRequestClient({
 		baseUrl: `http://127.0.0.1:${config.port}`,
 		headers: {
