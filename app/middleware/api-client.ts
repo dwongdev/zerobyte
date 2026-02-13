@@ -4,10 +4,11 @@ import {
 	createRequestClient,
 	runWithRequestClient,
 } from "~/lib/request-client";
+import { config } from "../server/core/config";
 
 export const apiClientMiddleware = createMiddleware().server(async ({ next, request }) => {
 	const client = createRequestClient({
-		baseUrl: new URL(request.url).origin,
+		baseUrl: `http://127.0.0.1:${config.port}`,
 		headers: {
 			cookie: getRequestHeaders().get("cookie") ?? "",
 		},
