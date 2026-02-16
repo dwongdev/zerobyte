@@ -332,14 +332,16 @@ const reorderSchedules = async (scheduleIds: number[]) => {
 		}
 	}
 
-	db.transaction((tx) => {
+	await db.transaction(async (tx) => {
 		const now = Date.now();
-		for (const [index, scheduleId] of scheduleIds.entries()) {
-			tx.update(backupSchedulesTable)
-				.set({ sortOrder: index, updatedAt: now })
-				.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId)))
-				.run();
-		}
+		await Promise.all(
+			scheduleIds.map((scheduleId, index) =>
+				tx
+					.update(backupSchedulesTable)
+					.set({ sortOrder: index, updatedAt: now })
+					.where(and(eq(backupSchedulesTable.id, scheduleId), eq(backupSchedulesTable.organizationId, organizationId))),
+			),
+		);
 	});
 };
 

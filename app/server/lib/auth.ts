@@ -68,28 +68,24 @@ export const auth = betterAuth({
 					};
 
 					try {
-						db.transaction((tx) => {
+						await db.transaction(async (tx) => {
 							const orgId = Bun.randomUUIDv7();
 
-							tx.insert(organizationTable)
-								.values({
-									name: `${user.name}'s Workspace`,
-									slug: slug,
-									id: orgId,
-									createdAt: new Date(),
-									metadata,
-								})
-								.run();
+							await tx.insert(organizationTable).values({
+								name: `${user.name}'s Workspace`,
+								slug: slug,
+								id: orgId,
+								createdAt: new Date(),
+								metadata,
+							});
 
-							tx.insert(member)
-								.values({
-									id: Bun.randomUUIDv7(),
-									userId: user.id,
-									role: "owner",
-									organizationId: orgId,
-									createdAt: new Date(),
-								})
-								.run();
+							await tx.insert(member).values({
+								id: Bun.randomUUIDv7(),
+								userId: user.id,
+								role: "owner",
+								organizationId: orgId,
+								createdAt: new Date(),
+							});
 						});
 					} catch {
 						await db.delete(usersTable).where(eq(usersTable.id, user.id));

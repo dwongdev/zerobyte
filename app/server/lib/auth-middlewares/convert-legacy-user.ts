@@ -28,91 +28,72 @@ export const convertLegacyUserOnFirstLogin = async (ctx: AuthMiddlewareContext) 
 		const isValid = await Bun.password.verify(body.password, legacyUser.passwordHash ?? "");
 
 		if (isValid) {
-			const newUserId = crypto.randomUUID();
-			const accountId = crypto.randomUUID();
+			await db.transaction(async (tx) => {
+				const newUserId = crypto.randomUUID();
+				const accountId = crypto.randomUUID();
 
-			const oldMembership = await db.query.member.findFirst({
-				where: { userId: legacyUser.id },
-				with: {
-					organization: true,
-				},
-			});
-
-			const passwordHash = await hashPassword(body.password);
-
-			let newOrganizationData: {
-				id: string;
-				name: string;
-				slug: string;
-				createdAt: Date;
-				metadata: {
-					resticPassword: string;
-				};
-			} | null = null;
-
-			if (!oldMembership?.organization) {
-				const resticPassword = cryptoUtils.generateResticPassword();
-				newOrganizationData = {
-					id: Bun.randomUUIDv7(),
-					name: `${legacyUser.name}'s Workspace`,
-					slug: legacyUser.email.split("@")[0] + "-" + Math.random().toString(36).slice(-4),
-					createdAt: new Date(),
-					metadata: {
-						resticPassword: await cryptoUtils.sealSecret(resticPassword),
+				const oldMembership = await tx.query.member.findFirst({
+					where: { userId: legacyUser.id },
+					with: {
+						organization: true,
 					},
-				};
-			}
+				});
 
-			db.transaction((tx) => {
-				tx.delete(usersTable).where(eq(usersTable.id, legacyUser.id)).run();
+				await tx.delete(usersTable).where(eq(usersTable.id, legacyUser.id));
 
-				tx.insert(usersTable)
-					.values({
-						id: newUserId,
-						username: legacyUser.username,
-						email: legacyUser.email,
-						name: legacyUser.name,
-						hasDownloadedResticPassword: legacyUser.hasDownloadedResticPassword,
-						emailVerified: false,
-						role: "admin", // In legacy system, the only user is an admin
-					})
-					.run();
+				await tx.insert(usersTable).values({
+					id: newUserId,
+					username: legacyUser.username,
+					email: legacyUser.email,
+					name: legacyUser.name,
+					hasDownloadedResticPassword: legacyUser.hasDownloadedResticPassword,
+					emailVerified: false,
+					role: "admin", // In legacy system, the only user is an admin
+				});
 
-				tx.insert(account)
-					.values({
-						id: accountId,
-						providerId: "credential",
-						accountId: legacyUser.username,
-						userId: newUserId,
-						password: passwordHash,
-						createdAt: new Date(),
-					})
-					.run();
+				await tx.insert(account).values({
+					id: accountId,
+					providerId: "credential",
+					accountId: legacyUser.username,
+					userId: newUserId,
+					password: await hashPassword(body.password),
+					createdAt: new Date(),
+				});
 
 				// Migrate organization membership to the new user
 				// The old membership was cascade-deleted when the old user was deleted
 				if (oldMembership?.organization) {
-					tx.insert(member)
-						.values({
-							id: Bun.randomUUIDv7(),
-							userId: newUserId,
-							organizationId: oldMembership.organization.id,
-							role: oldMembership.role,
-							createdAt: new Date(),
-						})
-						.run();
-				} else if (newOrganizationData) {
-					tx.insert(organization).values(newOrganizationData).run();
+					await tx.insert(member).values({
+						id: Bun.randomUUIDv7(),
+						userId: newUserId,
+						organizationId: oldMembership.organization.id,
+						role: oldMembership.role,
+						createdAt: new Date(),
+					});
+				} else {
+					const orgId = Bun.randomUUIDv7();
+					const slug = legacyUser.email.split("@")[0] + "-" + Math.random().toString(36).slice(-4);
 
-					tx.insert(member)
-						.values({
-							id: Bun.randomUUIDv7(),
-							userId: newUserId,
-							organizationId: newOrganizationData.id,
-							role: "owner",
-							createdAt: new Date(),
-						})
-						.run();
+					const resticPassword = cryptoUtils.generateResticPassword();
+					const metadata = {
+						resticPassword: await cryptoUtils.sealSecret(resticPassword),
+					};
+
+					await tx.insert(organization).values({
+						id: orgId,
+						name: `${legacyUser.name}'s Workspace`,
+						slug: slug,
+						createdAt: new Date(),
+						metadata,
+					});
+
+					await tx.insert(member).values({
+						id: Bun.randomUUIDv7(),
+						userId: newUserId,
+						organizationId: orgId,
+						role: "owner",
+						createdAt: new Date(),
+					});
 				}
 			});
 		} else {
