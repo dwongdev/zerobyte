@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
 
+test.describe.configure({ mode: "serial" });
+
 test.beforeAll(() => {
 	const testDataPath = path.join(process.cwd(), "playwright", "temp");
 	if (fs.existsSync(testDataPath)) {
@@ -61,7 +63,7 @@ test("can backup & restore a file", async ({ page }) => {
 	fs.writeFileSync(filePath, JSON.stringify({ data: "modified file" }));
 
 	// 6. Restores the file from backup
-	await page.getByRole('button', { name: /20 B/ }).click();
+	await page.getByRole("button", { name: /20 B/ }).click();
 	await page.getByRole("link", { name: "Restore" }).click();
 	await expect(page).toHaveURL(/\/restore/);
 	await page.getByRole("button", { name: "Restore All" }).click();
@@ -70,4 +72,20 @@ test("can backup & restore a file", async ({ page }) => {
 	// 7. Ensures that the file is back to its previous state
 	const restoredContent = fs.readFileSync(filePath, "utf8");
 	expect(JSON.parse(restoredContent)).toEqual({ data: "test file" });
+});
+
+test("deleting a volume cascades and removes its backup schedule", async ({ page }) => {
+	await page.goto("/backups");
+	await page.getByText("Test Backup", { exact: true }).first().click();
+
+	await expect(page.getByRole("link", { name: "Test Volume" })).toBeVisible();
+	await page.getByRole("link", { name: "Test Volume" }).click();
+
+	await page.getByRole("button", { name: "Delete" }).click();
+	await expect(page.getByText("All backup schedules associated with this volume will also be removed.")).toBeVisible();
+	await page.getByRole("button", { name: "Delete volume" }).click();
+	await expect(page.getByText("Volume deleted successfully")).toBeVisible();
+
+	await page.goto("/backups");
+	await expect(page.getByText("Test Backup", { exact: true })).toHaveCount(0);
 });

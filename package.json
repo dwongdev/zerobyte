@@ -3,7 +3,6 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"postinstall": "lefthook install",
 		"lint": "oxlint --type-aware",
 		"dev": "NODE_ENV=development bunx --bun vite",
 		"build": "vite build",
