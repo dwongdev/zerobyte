@@ -3,9 +3,9 @@ import { shutdown } from "./server/modules/lifecycle/shutdown";
 import { runCLI } from "./server/cli";
 import { createStartHandler, defaultStreamHandler, defineHandlerCallback } from "@tanstack/react-start/server";
 import { createServerEntry } from "@tanstack/react-start/server-entry";
-import { runDbMigrations } from "./server/db/db";
+import { sqlite } from "./server/db/db";
 
-await runDbMigrations();
+sqlite.run("PRAGMA foreign_keys = ON;");
 
 const cliRun = await runCLI(Bun.argv);
 if (cliRun) {

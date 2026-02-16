@@ -14,7 +14,7 @@ if (fs.existsSync(path.join(path.dirname(DATABASE_URL), "ironmount.db")) && !fs.
 	fs.renameSync(path.join(path.dirname(DATABASE_URL), "ironmount.db"), DATABASE_URL);
 }
 
-const sqlite = new Database(DATABASE_URL);
+export const sqlite = new Database(DATABASE_URL);
 export const db = drizzle({ client: sqlite, relations, schema });
 
 let migrationsPromise: Promise<void> | undefined;
@@ -36,10 +36,9 @@ const runMigrations = async () => {
 };
 
 export const runDbMigrations = () => {
-	if (migrationsPromise) {
-		return migrationsPromise;
+	if (!migrationsPromise) {
+		migrationsPromise = runMigrations();
 	}
 
-	migrationsPromise = runMigrations();
 	return migrationsPromise;
 };
