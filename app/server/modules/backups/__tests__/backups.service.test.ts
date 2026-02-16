@@ -236,7 +236,7 @@ describe("listSchedules", () => {
 });
 
 describe("cleanupOrphanedSchedules", () => {
-	test("should delete orphaned schedules and their mirror assignments", async () => {
+	test("should return zero when cascades already removed orphaned schedules", async () => {
 		const healthyVolume = await createTestVolume();
 		const healthyRepository = await createTestRepository();
 		const healthySchedule = await createTestBackupSchedule({
@@ -262,7 +262,7 @@ describe("cleanupOrphanedSchedules", () => {
 
 		const cleanupResult = await backupsService.cleanupOrphanedSchedules();
 
-		expect(cleanupResult.deletedSchedules).toBeGreaterThanOrEqual(1);
+		expect(cleanupResult.deletedSchedules).toBe(0);
 
 		const deletedSchedule = await db.query.backupSchedulesTable.findFirst({
 			where: { id: orphanSchedule.id },

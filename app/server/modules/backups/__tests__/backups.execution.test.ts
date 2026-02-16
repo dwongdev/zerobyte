@@ -12,6 +12,7 @@ import * as context from "~/server/core/request-context";
 import * as spawnModule from "~/server/utils/spawn";
 import { restic } from "~/server/utils/restic";
 import { NotFoundError, BadRequestError } from "http-errors-enhanced";
+import { scheduleQueries } from "../backups.queries";
 
 const resticBackupMock = mock(() => Promise.resolve({ exitCode: 0, summary: generateBackupOutput(), error: "" }));
 const resticForgetMock = mock(() => Promise.resolve({ success: true, data: null }));
@@ -55,11 +56,20 @@ describe("backup execution - validation failures", () => {
 
 	test("should fail backup when volume does not exist", async () => {
 		// arrange
+		const volume = await createTestVolume();
 		const repository = await createTestRepository();
 		const schedule = await createTestBackupSchedule({
-			volumeId: 99999,
+			volumeId: volume.id,
 			repositoryId: repository.id,
 		});
+
+		const hydratedSchedule = await scheduleQueries.findById(schedule.id, TEST_ORG_ID);
+		expect(hydratedSchedule).toBeDefined();
+		const scheduleWithoutVolume = {
+			...hydratedSchedule!,
+			volume: null,
+		} as unknown as NonNullable<Awaited<ReturnType<typeof scheduleQueries.findById>>>;
+		spyOn(scheduleQueries, "findById").mockResolvedValueOnce(scheduleWithoutVolume);
 
 		// act
 		const result = await backupsExecutionService.validateBackupExecution(schedule.id);
@@ -76,10 +86,19 @@ describe("backup execution - validation failures", () => {
 	test("should fail backup when repository does not exist", async () => {
 		// arrange
 		const volume = await createTestVolume();
+		const repository = await createTestRepository();
 		const schedule = await createTestBackupSchedule({
 			volumeId: volume.id,
-			repositoryId: "non-existent-repo",
+			repositoryId: repository.id,
 		});
+
+		const hydratedSchedule = await scheduleQueries.findById(schedule.id, TEST_ORG_ID);
+		expect(hydratedSchedule).toBeDefined();
+		const scheduleWithoutRepository = {
+			...hydratedSchedule!,
+			repository: null,
+		} as unknown as NonNullable<Awaited<ReturnType<typeof scheduleQueries.findById>>>;
+		spyOn(scheduleQueries, "findById").mockResolvedValueOnce(scheduleWithoutRepository);
 
 		// act
 		const result = await backupsExecutionService.validateBackupExecution(schedule.id);
@@ -216,14 +235,13 @@ describe("retention policy - runForget", () => {
 	test("should throw NotFoundError when repository does not exist", async () => {
 		// arrange
 		const schedule = await createTestBackupSchedule({
-			repositoryId: "non-existent-repo",
 			retentionPolicy: {
 				keepHourly: 24,
 			},
 		});
 
 		// act & assert
-		expect(backupsExecutionService.runForget(schedule.id)).rejects.toThrow("Repository not found");
+		expect(backupsExecutionService.runForget(schedule.id, "non-existent-repo")).rejects.toThrow("Repository not found");
 	});
 });
 

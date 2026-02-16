@@ -25,4 +25,5 @@ void mock.module("~/server/utils/crypto", () => ({
 beforeAll(async () => {
 	const migrationsFolder = path.join(cwd(), "app", "drizzle");
 	migrate(db, { migrationsFolder });
+	db.run("PRAGMA foreign_keys = ON;");
 });

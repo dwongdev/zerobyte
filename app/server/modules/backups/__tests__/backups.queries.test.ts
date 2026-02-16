@@ -3,6 +3,7 @@ import { scheduleQueries } from "../backups.queries";
 import { createTestBackupSchedule } from "~/test/helpers/backup";
 import { createTestVolume } from "~/test/helpers/volume";
 import { createTestRepository } from "~/test/helpers/repository";
+import { createTestOrganization } from "~/test/helpers/organization";
 import { TEST_ORG_ID } from "~/test/helpers/organization";
 import { faker } from "@faker-js/faker";
 
@@ -140,6 +141,7 @@ describe("scheduleQueries.findExecutable", () => {
 	test("should not return schedules from other organizations", async () => {
 		// arrange
 		const otherOrgId = faker.string.uuid();
+		await createTestOrganization({ id: otherOrgId });
 		const schedule = await createTestBackupSchedule({
 			volumeId: volume.id,
 			repositoryId: repository.id,
