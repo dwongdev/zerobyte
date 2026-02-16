@@ -4,6 +4,7 @@ import { changeUsernameCommand } from "./commands/change-username";
 import { disable2FACommand } from "./commands/disable-2fa";
 import { rekey2FACommand } from "./commands/rekey-2fa";
 import { resetPasswordCommand } from "./commands/reset-password";
+import { db } from "../db/db";
 
 const program = new Command();
 
@@ -15,6 +16,8 @@ program.addCommand(rekey2FACommand);
 program.addCommand(assignOrganizationCommand);
 
 export async function runCLI(argv: string[]): Promise<boolean> {
+	db.run("PRAGMA foreign_keys = ON;");
+
 	const args = argv.slice(2);
 	const isCLIMode = process.env.ZEROBYTE_CLI === "1";
 
