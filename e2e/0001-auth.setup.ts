@@ -2,6 +2,7 @@ import fs from "fs";
 import { test, expect } from "@playwright/test";
 import { resetDatabase } from "./helpers/db";
 import path from "node:path";
+import { gotoAndWaitForAppReady } from "./helpers/page";
 
 const authFile = path.join(process.cwd(), "./playwright/.auth/user.json");
 
@@ -15,7 +16,7 @@ test.beforeAll(async () => {
 });
 
 test("should redirect to onboarding", async ({ page }) => {
-	await page.goto("/");
+	await gotoAndWaitForAppReady(page, "/");
 
 	await page.waitForURL(/onboarding/);
 
@@ -23,7 +24,7 @@ test("should redirect to onboarding", async ({ page }) => {
 });
 
 test("user can register a new account", async ({ page }) => {
-	await page.goto("/onboarding");
+	await gotoAndWaitForAppReady(page, "/onboarding");
 
 	await page.getByRole("textbox", { name: "Email" }).click();
 	await page.getByRole("textbox", { name: "Email" }).fill("test@test.com");
@@ -39,7 +40,7 @@ test("user can register a new account", async ({ page }) => {
 });
 
 test("user can download recovery key", async ({ page }) => {
-	await page.goto("/login");
+	await gotoAndWaitForAppReady(page, "/login");
 
 	await page.getByRole("textbox", { name: "Username" }).fill("test");
 	await page.getByRole("textbox", { name: "Password" }).fill("password");
@@ -69,7 +70,7 @@ test("user can download recovery key", async ({ page }) => {
 });
 
 test("can't create another admin user after initial setup", async ({ page }) => {
-	await page.goto("/onboarding");
+	await gotoAndWaitForAppReady(page, "/onboarding");
 
 	await page.getByRole("textbox", { name: "Email" }).click();
 	await page.getByRole("textbox", { name: "Email" }).fill("test@test.com");
@@ -85,7 +86,7 @@ test("can't create another admin user after initial setup", async ({ page }) => 
 });
 
 test("can login after initial setup", async ({ page }) => {
-	await page.goto("/login");
+	await gotoAndWaitForAppReady(page, "/login");
 
 	await page.getByRole("textbox", { name: "Username" }).fill("test");
 	await page.getByRole("textbox", { name: "Password" }).fill("password");

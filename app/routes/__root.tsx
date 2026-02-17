@@ -4,6 +4,7 @@ import { apiClientMiddleware } from "~/middleware/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import { Toaster } from "~/client/components/ui/sonner";
 import { useServerEvents } from "~/client/hooks/use-server-events";
+import { useEffect } from "react";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
 	server: {
@@ -34,6 +35,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootLayout() {
 	useServerEvents();
+	useEffect(() => {
+		document.body.setAttribute("data-app-ready", "true");
+		return () => {
+			document.body.removeAttribute("data-app-ready");
+		};
+	}, []);
 
 	return (
 		<html lang="en">

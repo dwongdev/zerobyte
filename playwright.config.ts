@@ -11,7 +11,7 @@ export default defineConfig({
 	use: {
 		baseURL: `http://${process.env.SERVER_IP}:4096`,
 		video: "retain-on-failure",
-		trace: "on-first-retry",
+		trace: "retain-on-failure",
 	},
 	projects: [
 		{

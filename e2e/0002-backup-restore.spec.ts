@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
+import { gotoAndWaitForAppReady } from "./helpers/page";
 
 test.describe.configure({ mode: "serial" });
 
@@ -16,7 +17,7 @@ test.beforeAll(() => {
 });
 
 test("can backup & restore a file", async ({ page }) => {
-	await page.goto("/");
+	await gotoAndWaitForAppReady(page, "/");
 	await expect(page).toHaveURL("/volumes");
 
 	// 0. Create a test file in /test-data
@@ -75,17 +76,24 @@ test("can backup & restore a file", async ({ page }) => {
 });
 
 test("deleting a volume cascades and removes its backup schedule", async ({ page }) => {
-	await page.goto("/backups");
+	await gotoAndWaitForAppReady(page, "/backups");
 	await page.getByText("Test Backup", { exact: true }).first().click();
 
-	await expect(page.getByRole("link", { name: "Test Volume" })).toBeVisible();
-	await page.getByRole("link", { name: "Test Volume" }).click();
+	const volumeLink = page.locator("main").getByRole("link", { name: "Test Volume", exact: true }).first();
+	await expect(volumeLink).toBeVisible();
+	await volumeLink.click();
+	await expect(page).toHaveURL(/\/volumes\/[^/?#]+/);
+	await expect(page.getByText("Volume Configuration", { exact: true })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
 
-	await page.getByRole("button", { name: "Delete" }).click();
+	await expect(async () => {
+		await page.getByRole("button", { name: "Delete" }).click();
+		await expect(page.getByRole("heading", { name: "Delete volume?" })).toBeVisible();
+	}).toPass({ timeout: 10000 });
 	await expect(page.getByText("All backup schedules associated with this volume will also be removed.")).toBeVisible();
 	await page.getByRole("button", { name: "Delete volume" }).click();
 	await expect(page.getByText("Volume deleted successfully")).toBeVisible();
 
-	await page.goto("/backups");
+	await gotoAndWaitForAppReady(page, "/backups");
 	await expect(page.getByText("Test Backup", { exact: true })).toHaveCount(0);
 });
