@@ -7,6 +7,17 @@ In case you need further assistance, feel free to open a new issue with detailed
 > [!WARNING]
 > Make sure to never share sensitive information such as passwords, access keys, or personal data in public issues so remove them from logs before posting.
 
+Before troubleshooting, enable debug logging so the logs contain enough detail to diagnose issues.
+
+```yaml
+services:
+  zerobyte:
+    environment:
+      - LOG_LEVEL=debug
+```
+
+After adding `LOG_LEVEL=debug`, restart Zerobyte and then collect logs.
+
 To view the logs, run the command below:
 
 ```bash
