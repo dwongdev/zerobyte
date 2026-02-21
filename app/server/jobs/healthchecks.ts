@@ -15,12 +15,16 @@ export class VolumeHealthCheckJob extends Job {
 		});
 
 		for (const volume of volumes) {
-			await withContext({ organizationId: volume.organizationId }, async () => {
-				const { status } = await volumeService.checkHealth(volume.id);
-				if (status === "error" && volume.autoRemount) {
-					await volumeService.mountVolume(volume.id);
-				}
-			});
+			try {
+				await withContext({ organizationId: volume.organizationId }, async () => {
+					const { status } = await volumeService.checkHealth(volume.shortId);
+					if (status === "error" && volume.autoRemount) {
+						await volumeService.mountVolume(volume.shortId);
+					}
+				});
+			} catch (error) {
+				logger.error(`Health check failed for volume ${volume.name}:`, error);
+			}
 		}
 
 		return { done: true, timestamp: new Date() };
