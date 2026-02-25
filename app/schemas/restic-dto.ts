@@ -42,7 +42,7 @@ export const resticBackupProgressMetricsSchema = type({
 	files_done: "number",
 	total_bytes: "number",
 	bytes_done: "number",
-	current_files: "string[]",
+	current_files: "string[] | undefined?",
 });
 
 export const resticBackupProgressSchema = resticBackupProgressMetricsSchema.and(
