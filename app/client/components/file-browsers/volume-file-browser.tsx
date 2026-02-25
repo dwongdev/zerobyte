@@ -38,13 +38,6 @@ export const VolumeFileBrowser = ({ volumeId, enabled = true, ...uiProps }: Volu
 		},
 	});
 
-	const errorDetails = parseError(error)?.message;
-	const errorMessage = errorDetails
-		? `Failed to load files: ${errorDetails}`
-		: error
-			? "Failed to load files"
-			: undefined;
-
 	return (
 		<FileBrowser
 			{...uiProps}
@@ -57,7 +50,7 @@ export const VolumeFileBrowser = ({ volumeId, enabled = true, ...uiProps }: Volu
 			getFolderPagination={fileBrowser.getFolderPagination}
 			isLoading={fileBrowser.isLoading}
 			isEmpty={fileBrowser.isEmpty}
-			errorMessage={errorMessage}
+			errorMessage={parseError(error)?.message}
 			loadingMessage={uiProps.loadingMessage ?? "Loading files..."}
 			emptyMessage={uiProps.emptyMessage ?? "This volume appears to be empty."}
 		/>

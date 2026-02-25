@@ -135,13 +135,6 @@ export const SnapshotTreeBrowser = ({
 		[onSelectionChange, addBasePath, onSingleSelectionKindChange, displayPathKinds],
 	);
 
-	const errorDetails = parseError(error)?.message;
-	const errorMessage = errorDetails
-		? `Failed to load files: ${errorDetails}`
-		: error
-			? "Failed to load files"
-			: undefined;
-
 	return (
 		<FileBrowser
 			{...fileBrowserUiProps}
@@ -154,7 +147,7 @@ export const SnapshotTreeBrowser = ({
 			getFolderPagination={fileBrowser.getFolderPagination}
 			isLoading={fileBrowser.isLoading}
 			isEmpty={fileBrowser.isEmpty}
-			errorMessage={errorMessage}
+			errorMessage={parseError(error)?.message}
 			loadingMessage={fileBrowserUiProps.loadingMessage ?? "Loading files..."}
 			selectedPaths={displaySelectedPaths}
 			onSelectionChange={onSelectionChange ? handleSelectionChange : undefined}

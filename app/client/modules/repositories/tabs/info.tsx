@@ -26,6 +26,7 @@ import { DoctorReport } from "../components/doctor-report";
 import { parseError } from "~/client/lib/errors";
 import { useNavigate } from "@tanstack/react-router";
 import { CompressionStatsChart } from "../components/compression-stats-chart";
+import { cn } from "~/client/lib/utils";
 
 type Props = {
 	repository: Repository;
@@ -94,6 +95,12 @@ export const RepositoryInfoTabContent = ({ repository }: Props) => {
 	};
 
 	const config = repository.config as RepositoryConfig;
+	const isDoctorRunning = repository.status === "doctor";
+	const hasLocalPath = Boolean(effectiveLocalPath);
+	const hasCaCert = Boolean(config.cacert);
+	const hasLastError = Boolean(repository.lastError);
+	const hasInsecureTlsConfig = config.insecureTls !== undefined;
+	const isTlsValidationDisabled = config.insecureTls === true;
 
 	return (
 		<>
@@ -112,26 +119,25 @@ export const RepositoryInfoTabContent = ({ repository }: Props) => {
 								<Pencil className="h-4 w-4 mr-2" />
 								Edit
 							</Button>
-							{repository.status === "doctor" ? (
-								<Button
-									type="button"
-									variant="destructive"
-									loading={cancelDoctor.isPending}
-									onClick={() => cancelDoctor.mutate({ path: { shortId: repository.shortId } })}
-								>
-									<Square className="h-4 w-4 mr-2" />
-									<span>Cancel doctor</span>
-								</Button>
-							) : (
-								<Button
-									type="button"
-									onClick={() => startDoctor.mutate({ path: { shortId: repository.shortId } })}
-									disabled={startDoctor.isPending}
-								>
-									<Stethoscope className="h-4 w-4 mr-2" />
-									Run doctor
-								</Button>
-							)}
+							<Button
+								type="button"
+								variant="destructive"
+								loading={cancelDoctor.isPending}
+								onClick={() => cancelDoctor.mutate({ path: { shortId: repository.shortId } })}
+								className={cn({ hidden: !isDoctorRunning })}
+							>
+								<Square className="h-4 w-4 mr-2" />
+								<span>Cancel doctor</span>
+							</Button>
+							<Button
+								type="button"
+								onClick={() => startDoctor.mutate({ path: { shortId: repository.shortId } })}
+								disabled={startDoctor.isPending}
+								className={cn({ hidden: isDoctorRunning })}
+							>
+								<Stethoscope className="h-4 w-4 mr-2" />
+								Run doctor
+							</Button>
 							<Button
 								type="button"
 								variant="outline"
@@ -178,12 +184,10 @@ export const RepositoryInfoTabContent = ({ repository }: Props) => {
 								<div className="text-sm font-medium text-muted-foreground">Status</div>
 								<p className="mt-1 text-sm">{repository.status || "unknown"}</p>
 							</div>
-							{effectiveLocalPath && (
-								<div>
-									<div className="text-sm font-medium text-muted-foreground">Local path</div>
-									<p className="mt-1 text-sm font-mono">{effectiveLocalPath}</p>
-								</div>
-							)}
+							<div className={cn({ hidden: !hasLocalPath })}>
+								<div className="text-sm font-medium text-muted-foreground">Local path</div>
+								<p className="mt-1 text-sm font-mono">{effectiveLocalPath}</p>
+							</div>
 							<div>
 								<div className="text-sm font-medium text-muted-foreground">Created at</div>
 								<p className="mt-1 text-sm">{formatDateTime(repository.createdAt)}</p>
@@ -192,40 +196,31 @@ export const RepositoryInfoTabContent = ({ repository }: Props) => {
 								<div className="text-sm font-medium text-muted-foreground">Last checked</div>
 								<p className="mt-1 text-sm">{formatTimeAgo(repository.lastChecked)}</p>
 							</div>
-							{config.cacert && (
-								<div>
-									<div className="text-sm font-medium text-muted-foreground">CA Certificate</div>
-									<p className="mt-1 text-sm">
-										<span className="text-green-500">configured</span>
-									</p>
-								</div>
-							)}
-							{"insecureTls" in config && (
-								<div>
-									<div className="text-sm font-medium text-muted-foreground">TLS Certificate Validation</div>
-									<p className="mt-1 text-sm">
-										{config.insecureTls ? (
-											<span className="text-red-500">disabled</span>
-										) : (
-											<span className="text-green-500">enabled</span>
-										)}
-									</p>
-								</div>
-							)}
+							<div className={cn({ hidden: !hasCaCert })}>
+								<div className="text-sm font-medium text-muted-foreground">CA Certificate</div>
+								<p className="mt-1 text-sm">
+									<span className="text-green-500">configured</span>
+								</p>
+							</div>
+							<div className={cn({ hidden: !hasInsecureTlsConfig })}>
+								<div className="text-sm font-medium text-muted-foreground">TLS Certificate Validation</div>
+								<p className="mt-1 text-sm">
+									<span className={cn("text-red-500", { hidden: !isTlsValidationDisabled })}>disabled</span>
+									<span className={cn("text-green-500", { hidden: isTlsValidationDisabled })}>enabled</span>
+								</p>
+							</div>
 						</div>
 					</div>
 
 					<div>
-						{repository.lastError && (
-							<div>
-								<div className="flex items-center justify-between mb-4">
-									<h3 className="text-lg font-semibold text-red-500">Last Error</h3>
-								</div>
-								<div className="bg-red-500/10 border border-red-500/20 rounded-md p-4">
-									<p className="text-sm text-red-500 wrap-break-word">{repository.lastError}</p>
-								</div>
+						<div className={cn({ hidden: !hasLastError })}>
+							<div className="flex items-center justify-between mb-4">
+								<h3 className="text-lg font-semibold text-red-500">Last Error</h3>
 							</div>
-						)}
+							<div className="bg-red-500/10 border border-red-500/20 rounded-md p-4">
+								<p className="text-sm text-red-500 wrap-break-word">{repository.lastError}</p>
+							</div>
+						</div>
 
 						<div>
 							<h3 className="text-lg font-semibold mb-4">Configuration</h3>

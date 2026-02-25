@@ -150,30 +150,22 @@ export function RestoreForm({ repository, snapshotId, returnPath, basePath }: Re
 	]);
 
 	const handleDownload = useCallback(() => {
-		if (selectedPaths.size > 1) {
-			return;
-		}
+		if (selectedPaths.size > 1) return;
 
-		const dumpUrl = new URL(
+		const url = new URL(
 			`/api/v1/repositories/${repository.shortId}/snapshots/${snapshotId}/dump`,
 			window.location.origin,
 		);
 
-		if (selectedPaths.size === 1) {
-			const [selectedPath] = selectedPaths;
-			if (selectedPath) {
-				dumpUrl.searchParams.set("path", selectedPath);
-				if (selectedPathKind) {
-					dumpUrl.searchParams.set("kind", selectedPathKind);
-				}
+		const [selectedPath] = selectedPaths;
+		if (selectedPath) {
+			url.searchParams.set("path", selectedPath);
+			if (selectedPathKind) {
+				url.searchParams.set("kind", selectedPathKind);
 			}
 		}
 
-		const link = document.createElement("a");
-		link.href = dumpUrl.toString();
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
+		window.location.assign(url.toString());
 	}, [repository.shortId, snapshotId, selectedPathKind, selectedPaths]);
 
 	const acknowledgeRestoreResult = useCallback(() => {

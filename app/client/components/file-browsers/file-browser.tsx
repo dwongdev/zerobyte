@@ -134,15 +134,10 @@ export const FileBrowser = (props: FileBrowserProps) => {
 	}
 
 	const bodyWithScroll = useScrollArea ? <ScrollArea className={scrollAreaClassName}>{body}</ScrollArea> : body;
-	const wrappedBody = treeContainerClassName ? (
-		<div className={treeContainerClassName}>{bodyWithScroll}</div>
-	) : (
-		bodyWithScroll
-	);
 
 	return (
 		<div className={className}>
-			{wrappedBody}
+			<div className={treeContainerClassName}>{bodyWithScroll}</div>
 			{showSelectedPathFooter && resolvedSelectedPath && (
 				<div className="bg-muted/50 border-t p-2 text-sm">
 					<div className="font-medium text-muted-foreground">{selectedPathLabel}</div>

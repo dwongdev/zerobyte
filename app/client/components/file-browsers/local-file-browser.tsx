@@ -30,13 +30,6 @@ export const LocalFileBrowser = ({ initialPath = "/", enabled = true, ...uiProps
 		},
 	});
 
-	const errorDetails = parseError(error)?.message;
-	const errorMessage = errorDetails
-		? `Failed to load directories: ${errorDetails}`
-		: error
-			? "Failed to load directories"
-			: undefined;
-
 	return (
 		<FileBrowser
 			{...uiProps}
@@ -49,7 +42,7 @@ export const LocalFileBrowser = ({ initialPath = "/", enabled = true, ...uiProps
 			getFolderPagination={fileBrowser.getFolderPagination}
 			isLoading={fileBrowser.isLoading}
 			isEmpty={fileBrowser.isEmpty}
-			errorMessage={errorMessage}
+			errorMessage={parseError(error)?.message}
 			loadingMessage={uiProps.loadingMessage ?? "Loading directories..."}
 			emptyMessage={uiProps.emptyMessage ?? "No subdirectories found"}
 		/>
