@@ -405,7 +405,7 @@ describe("repositoriesService.deleteSnapshot", () => {
 			throw new ResticError(1, "Fatal: unexpected HTTP response (403): 403 Forbidden");
 		});
 
-		await expect(
+		expect(
 			withContext({ organizationId, userId: user.id }, () =>
 				repositoriesService.deleteSnapshot(repository.shortId, "snap123"),
 			),

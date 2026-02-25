@@ -43,7 +43,7 @@ export const BackupProgressCard = ({ scheduleShortId, initialProgress }: Props) 
 	}, [addEventListener, scheduleShortId]);
 
 	const percentDone = progress ? Math.round(progress.percent_done * 100) : 0;
-	const currentFile = progress?.current_files[0] || "";
+	const currentFile = progress?.current_files?.[0] || "";
 	const fileName = currentFile.split("/").pop() || currentFile;
 	const speed = progress ? formatBytes(progress.bytes_done / progress.seconds_elapsed) : null;
 

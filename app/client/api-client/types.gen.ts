@@ -3993,7 +3993,6 @@ export type GetBackupProgressResponses = {
 	 */
 	200: {
 		bytes_done: number;
-		current_files: Array<string>;
 		files_done: number;
 		percent_done: number;
 		repositoryName: string;
@@ -4002,6 +4001,7 @@ export type GetBackupProgressResponses = {
 		total_bytes: number;
 		total_files: number;
 		volumeName: string;
+		current_files?: Array<string>;
 	} | null;
 };
 
