@@ -1,4 +1,4 @@
-import { test, describe, expect } from "bun:test";
+import { test, describe, expect, spyOn } from "bun:test";
 import crypto from "node:crypto";
 import { createApp } from "~/server/app";
 import { db } from "~/server/db/db";
@@ -239,5 +239,32 @@ describe("repositories updates", () => {
 		});
 
 		expect(res.status).toBe(400);
+	});
+
+	describe("delete snapshot", () => {
+		test("should return 500 when restic deleteSnapshot throws ResticError", async () => {
+			const { token, organizationId } = await createTestSession();
+			const repository = await createRepositoryRecord(organizationId);
+
+			const { restic } = await import("~/server/utils/restic");
+			const { ResticError } = await import("~/server/utils/errors");
+
+			const deleteSnapshotSpy = spyOn(restic, "deleteSnapshot").mockImplementation(async () => {
+				throw new ResticError(1, "Fatal: unexpected HTTP response (403): 403 Forbidden");
+			});
+
+			try {
+				const res = await app.request(`/api/v1/repositories/${repository.shortId}/snapshots/snap123`, {
+					method: "DELETE",
+					headers: getAuthHeaders(token),
+				});
+
+				expect(res.status).toBe(500);
+				const body = await res.json();
+				expect(body.message).toContain("Command failed");
+			} finally {
+				deleteSnapshotSpy.mockRestore();
+			}
+		});
 	});
 });
