@@ -32,6 +32,7 @@ export const backup = async (
 		compressionMode?: CompressionMode;
 		signal?: AbortSignal;
 		onProgress?: (progress: ResticBackupProgressDto) => void;
+		customResticParams?: string[];
 	},
 ) => {
 	const repoUrl = buildRepoUrl(config);
@@ -82,6 +83,13 @@ export const backup = async (
 	if (options.excludeIfPresent && options.excludeIfPresent.length > 0) {
 		for (const filename of options.excludeIfPresent) {
 			args.push("--exclude-if-present", filename);
+		}
+	}
+
+	if (options.customResticParams && options.customResticParams.length > 0) {
+		for (const param of options.customResticParams) {
+			const tokens = param.trim().split(/\s+/).filter(Boolean);
+			args.push(...tokens);
 		}
 	}
 

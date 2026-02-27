@@ -181,6 +181,7 @@ export function ScheduleDetailsPage(props: Props) {
 				excludePatterns: formValues.excludePatterns,
 				excludeIfPresent: formValues.excludeIfPresent,
 				oneFileSystem: formValues.oneFileSystem,
+				customResticParams: formValues.customResticParams,
 			},
 		});
 	};

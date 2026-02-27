@@ -20,6 +20,7 @@ export const internalFormSchema = type({
 	keepMonthly: "number?",
 	keepYearly: "number?",
 	oneFileSystem: "boolean?",
+	customResticParamsText: "string?",
 });
 
 export const cleanSchema = type.pipe((d) => internalFormSchema(deepClean(d)));
@@ -38,8 +39,9 @@ export type InternalFormValues = typeof internalFormSchema.infer;
 
 export type BackupScheduleFormValues = Omit<
 	InternalFormValues,
-	"excludePatternsText" | "excludeIfPresentText" | "includePatternsText"
+	"excludePatternsText" | "excludeIfPresentText" | "includePatternsText" | "customResticParamsText"
 > & {
 	excludePatterns?: string[];
 	excludeIfPresent?: string[];
+	customResticParams?: string[];
 };

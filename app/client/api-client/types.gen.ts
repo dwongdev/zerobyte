@@ -2202,6 +2202,7 @@ export type ListBackupSchedulesResponses = {
 		name: string;
 		nextBackupAt: number | null;
 		oneFileSystem: boolean;
+		customResticParams: Array<string> | null;
 		repository: {
 			compressionMode: "auto" | "max" | "off" | null;
 			config:
@@ -2485,6 +2486,7 @@ export type CreateBackupScheduleData = {
 		excludePatterns?: Array<string>;
 		includePatterns?: Array<string>;
 		oneFileSystem?: boolean;
+		customResticParams?: Array<string>;
 		retentionPolicy?: {
 			keepDaily?: number;
 			keepHourly?: number;
@@ -2519,6 +2521,7 @@ export type CreateBackupScheduleResponses = {
 		name: string;
 		nextBackupAt: number | null;
 		oneFileSystem: boolean;
+		customResticParams: Array<string> | null;
 		repositoryId: string;
 		retentionPolicy: {
 			keepDaily?: number;
@@ -2584,6 +2587,7 @@ export type GetBackupScheduleResponses = {
 		name: string;
 		nextBackupAt: number | null;
 		oneFileSystem: boolean;
+		customResticParams: Array<string> | null;
 		repository: {
 			compressionMode: "auto" | "max" | "off" | null;
 			config:
@@ -2866,6 +2870,7 @@ export type UpdateBackupScheduleData = {
 		includePatterns?: Array<string>;
 		name?: string;
 		oneFileSystem?: boolean;
+		customResticParams?: Array<string>;
 		retentionPolicy?: {
 			keepDaily?: number;
 			keepHourly?: number;
@@ -2902,6 +2907,7 @@ export type UpdateBackupScheduleResponses = {
 		name: string;
 		nextBackupAt: number | null;
 		oneFileSystem: boolean;
+		customResticParams: Array<string> | null;
 		repositoryId: string;
 		retentionPolicy: {
 			keepDaily?: number;
@@ -2947,6 +2953,7 @@ export type GetBackupScheduleForVolumeResponses = {
 		name: string;
 		nextBackupAt: number | null;
 		oneFileSystem: boolean;
+		customResticParams: Array<string> | null;
 		repository: {
 			compressionMode: "auto" | "max" | "off" | null;
 			config:

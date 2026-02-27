@@ -134,6 +134,7 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 			excludeIfPresent: data.excludeIfPresent ?? [],
 			includePatterns: data.includePatterns ?? [],
 			oneFileSystem: data.oneFileSystem,
+			customResticParams: data.customResticParams ?? [],
 			nextBackupAt: nextBackupAt,
 			shortId: generateShortId(),
 			organizationId,

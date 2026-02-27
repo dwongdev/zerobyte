@@ -271,6 +271,7 @@ export const backupSchedulesTable = sqliteTable("backup_schedules_table", {
 	lastBackupError: text("last_backup_error"),
 	nextBackupAt: int("next_backup_at", { mode: "number" }),
 	oneFileSystem: int("one_file_system", { mode: "boolean" }).notNull().default(false),
+	customResticParams: text("custom_restic_params", { mode: "json" }).$type<string[]>().default([]),
 	sortOrder: int("sort_order", { mode: "number" }).notNull().default(0),
 	createdAt: int("created_at", { mode: "number" })
 		.notNull()

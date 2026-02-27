@@ -5,6 +5,7 @@ import { useScrollToFormError } from "~/client/hooks/use-scroll-to-form-error";
 import { Form } from "~/client/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/client/components/ui/card";
 import type { BackupSchedule, Volume } from "~/client/lib/types";
+import { AdvancedSection } from "./advanced-section";
 import { BasicInfoSection } from "./basic-info-section";
 import { ExcludeSection } from "./exclude-section";
 import { FrequencySection } from "./frequency-section";
@@ -39,6 +40,7 @@ export const CreateScheduleForm = ({ initialValues, formId, onSubmit, volume }: 
 				excludePatternsText,
 				excludeIfPresentText,
 				includePatternsText,
+				customResticParamsText,
 				includePatterns: fileBrowserPatterns,
 				cronExpression,
 				...rest
@@ -65,12 +67,20 @@ export const CreateScheduleForm = ({ initialValues, formId, onSubmit, volume }: 
 				: [];
 			const includePatterns = [...(fileBrowserPatterns || []), ...textPatterns];
 
+			const customResticParams = customResticParamsText
+				? customResticParamsText
+						.split("\n")
+						.map((p) => p.trim())
+						.filter(Boolean)
+				: [];
+
 			onSubmit({
 				...rest,
 				cronExpression,
 				includePatterns: includePatterns.length > 0 ? includePatterns : [],
 				excludePatterns,
 				excludeIfPresent,
+				customResticParams,
 			});
 		},
 		[onSubmit],
@@ -162,6 +172,18 @@ export const CreateScheduleForm = ({ initialValues, formId, onSubmit, volume }: 
 						</CardHeader>
 						<CardContent className="grid gap-4 @medium:grid-cols-2">
 							<RetentionSection form={form} />
+						</CardContent>
+					</Card>
+
+					<Card className="min-w-0">
+						<CardHeader>
+							<CardTitle>Advanced</CardTitle>
+							<CardDescription>
+								Pass additional flags directly to the restic backup command. Use with caution.
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<AdvancedSection form={form} />
 						</CardContent>
 					</Card>
 				</div>
