@@ -51,6 +51,7 @@ type Props = {
 		repos: Repository[];
 		scheduleNotifs: ScheduleNotification[];
 		mirrors: ScheduleMirror[];
+		snapshots?: Snapshot[];
 	};
 	scheduleId: string;
 	initialSnapshotId?: string;
@@ -78,6 +79,7 @@ export function ScheduleDetailsPage(props: Props) {
 		failureReason,
 	} = useQuery({
 		...listSnapshotsOptions({ path: { shortId: schedule.repository.shortId }, query: { backupId: schedule.shortId } }),
+		initialData: loaderData.snapshots,
 	});
 
 	const updateSchedule = useMutation({

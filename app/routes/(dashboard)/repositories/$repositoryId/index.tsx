@@ -6,23 +6,26 @@ import {
 	listSnapshotsOptions,
 } from "~/client/api-client/@tanstack/react-query.gen";
 import RepositoryDetailsPage from "~/client/modules/repositories/routes/repository-details";
+import { prefetchOrSkip } from "~/utils/prefetch";
 
 export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/")({
 	component: RouteComponent,
 	errorComponent: (e) => <div>{e.error.message}</div>,
 	loader: async ({ params, context }) => {
-		void context.queryClient.prefetchQuery({
-			...listSnapshotsOptions({ path: { shortId: params.repositoryId } }),
-		});
-		void context.queryClient.prefetchQuery({
-			...listBackupSchedulesOptions(),
-		});
+		const snapshotOptions = listSnapshotsOptions({ path: { shortId: params.repositoryId } });
+		const schedulesOptions = listBackupSchedulesOptions();
 
-		const res = await context.queryClient.ensureQueryData({
-			...getRepositoryOptions({ path: { shortId: params.repositoryId } }),
-		});
+		const [res] = await Promise.all([
+			context.queryClient.ensureQueryData(getRepositoryOptions({ path: { shortId: params.repositoryId } })),
+			prefetchOrSkip(context.queryClient, snapshotOptions),
+			prefetchOrSkip(context.queryClient, schedulesOptions),
+		]);
 
-		return res;
+		return {
+			...res,
+			snapshots: context.queryClient.getQueryData(snapshotOptions.queryKey),
+			backupSchedules: context.queryClient.getQueryData(schedulesOptions.queryKey),
+		};
 	},
 	validateSearch: type({ tab: "string?" }),
 	staticData: {
@@ -44,6 +47,13 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/")
 
 function RouteComponent() {
 	const { repositoryId } = Route.useParams();
+	const { snapshots, backupSchedules } = Route.useLoaderData();
 
-	return <RepositoryDetailsPage repositoryId={repositoryId} />;
+	return (
+		<RepositoryDetailsPage
+			repositoryId={repositoryId}
+			initialSnapshots={snapshots}
+			initialBackupSchedules={backupSchedules}
+		/>
+	);
 }

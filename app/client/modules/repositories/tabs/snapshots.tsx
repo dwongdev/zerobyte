@@ -11,23 +11,26 @@ import { Button } from "~/client/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/client/components/ui/card";
 import { Input } from "~/client/components/ui/input";
 import { Table, TableBody, TableCell, TableRow } from "~/client/components/ui/table";
-import type { Repository, Snapshot } from "~/client/lib/types";
+import type { BackupSchedule, Repository, Snapshot } from "~/client/lib/types";
 import { toast } from "sonner";
 
 type Props = {
 	repository: Repository;
+	initialSnapshots?: Snapshot[];
+	initialBackupSchedules?: BackupSchedule[];
 };
 
-export const RepositorySnapshotsTabContent = ({ repository }: Props) => {
+export const RepositorySnapshotsTabContent = ({ repository, initialSnapshots, initialBackupSchedules }: Props) => {
 	const [searchQuery, setSearchQuery] = useState("");
 
-	const { data, isFetching, failureReason } = useQuery({
+	const { data, isPending, failureReason } = useQuery({
 		...listSnapshotsOptions({ path: { shortId: repository.shortId } }),
-		initialData: [],
+		initialData: initialSnapshots,
 	});
 
 	const schedules = useQuery({
 		...listBackupSchedulesOptions(),
+		initialData: initialBackupSchedules,
 	});
 
 	const refreshMutation = useMutation({
@@ -44,7 +47,9 @@ export const RepositorySnapshotsTabContent = ({ repository }: Props) => {
 		refreshMutation.mutate({ path: { shortId: repository.shortId } });
 	};
 
-	const filteredSnapshots = data.filter((snapshot: Snapshot) => {
+	const snapshots = data ?? [];
+
+	const filteredSnapshots = snapshots.filter((snapshot: Snapshot) => {
 		if (!searchQuery) return true;
 		const searchLower = searchQuery.toLowerCase();
 
@@ -58,7 +63,7 @@ export const RepositorySnapshotsTabContent = ({ repository }: Props) => {
 		);
 	});
 
-	const hasNoFilteredSnapshots = !filteredSnapshots?.length;
+	const hasNoFilteredSnapshots = !filteredSnapshots.length;
 
 	if (repository.status === "error") {
 		return (
@@ -91,7 +96,7 @@ export const RepositorySnapshotsTabContent = ({ repository }: Props) => {
 		);
 	}
 
-	if (isFetching && !data.length) {
+	if (isPending) {
 		return (
 			<Card>
 				<CardContent className="flex items-center justify-center py-12">
@@ -101,7 +106,7 @@ export const RepositorySnapshotsTabContent = ({ repository }: Props) => {
 		);
 	}
 
-	if (!data.length) {
+	if (!snapshots.length) {
 		return (
 			<Card>
 				<CardContent className="flex flex-col items-center justify-center text-center py-16 px-4">
@@ -131,7 +136,7 @@ export const RepositorySnapshotsTabContent = ({ repository }: Props) => {
 					<div className="flex-1">
 						<CardTitle>Snapshots</CardTitle>
 						<CardDescription className="mt-1">
-							Backup snapshots stored in this repository. Total: {data.length}
+							Backup snapshots stored in this repository. Total: {snapshots.length}
 						</CardDescription>
 					</div>
 					<div className="flex gap-2 items-center">
@@ -180,7 +185,7 @@ export const RepositorySnapshotsTabContent = ({ repository }: Props) => {
 				<span>
 					{hasNoFilteredSnapshots
 						? "No snapshots match filters."
-						: `Showing ${filteredSnapshots.length} of ${data.length}`}
+						: `Showing ${filteredSnapshots.length} of ${snapshots.length}`}
 				</span>
 			</div>
 		</Card>

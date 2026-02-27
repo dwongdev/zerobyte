@@ -9,6 +9,7 @@ import {
 	listSnapshotsOptions,
 } from "~/client/api-client/@tanstack/react-query.gen";
 import { ScheduleDetailsPage } from "~/client/modules/backups/routes/backup-details";
+import { prefetchOrSkip } from "~/utils/prefetch";
 
 export const Route = createFileRoute("/(dashboard)/backups/$backupId/")({
 	component: RouteComponent,
@@ -24,14 +25,21 @@ export const Route = createFileRoute("/(dashboard)/backups/$backupId/")({
 			context.queryClient.ensureQueryData({ ...getScheduleMirrorsOptions({ path: { shortId: backupId } }) }),
 		]);
 
-		void context.queryClient.prefetchQuery({
-			...listSnapshotsOptions({
-				path: { shortId: schedule.repository.shortId },
-				query: { backupId: schedule.shortId },
-			}),
+		const snapshotOptions = listSnapshotsOptions({
+			path: { shortId: schedule.repository.shortId },
+			query: { backupId: schedule.shortId },
 		});
 
-		return { schedule, notifs, repos, scheduleNotifs, mirrors };
+		await prefetchOrSkip(context.queryClient, snapshotOptions);
+
+		return {
+			schedule,
+			notifs,
+			repos,
+			scheduleNotifs,
+			mirrors,
+			snapshots: context.queryClient.getQueryData(snapshotOptions.queryKey),
+		};
 	},
 	staticData: {
 		breadcrumb: (match) => [
