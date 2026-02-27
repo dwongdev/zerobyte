@@ -1,8 +1,8 @@
-import { test, describe, mock, beforeEach, afterEach, expect } from "bun:test";
+import { test, describe, beforeEach, expect } from "bun:test";
 import { convertLegacyUserOnFirstLogin } from "../convert-legacy-user";
 import { db } from "~/server/db/db";
 import { usersTable, account, organization, member } from "~/server/db/schema";
-import type { AuthMiddlewareContext } from "../../auth";
+import type { AuthMiddlewareContext } from "~/server/lib/auth";
 
 describe("convertLegacyUserOnFirstLogin", () => {
 	beforeEach(async () => {
@@ -10,10 +10,6 @@ describe("convertLegacyUserOnFirstLogin", () => {
 		await db.delete(account);
 		await db.delete(organization);
 		await db.delete(usersTable);
-	});
-
-	afterEach(() => {
-		mock.restore();
 	});
 
 	const createContext = (path: string, body: Record<string, string>) => ({ path, body }) as AuthMiddlewareContext;

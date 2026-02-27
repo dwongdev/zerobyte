@@ -173,6 +173,27 @@ export const invitation = sqliteTable(
 	],
 );
 
+export const ssoProvider = sqliteTable("sso_provider", {
+	id: text("id").primaryKey(),
+	providerId: text("provider_id").notNull().unique(),
+	organizationId: text("organization_id")
+		.notNull()
+		.references(() => organization.id, { onDelete: "cascade" }),
+	userId: text("user_id").references(() => usersTable.id, { onDelete: "set null" }),
+	issuer: text("issuer").notNull(),
+	domain: text("domain").notNull(),
+	autoLinkMatchingEmails: int("auto_link_matching_emails", { mode: "boolean" }).notNull().default(false),
+	oidcConfig: text("oidc_config", { mode: "json" }).$type<Record<string, unknown> | null>(),
+	samlConfig: text("saml_config", { mode: "json" }).$type<Record<string, unknown> | null>(),
+	createdAt: integer("created_at", { mode: "timestamp_ms" })
+		.notNull()
+		.default(sql`(unixepoch() * 1000)`),
+	updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+		.notNull()
+		.$onUpdate(() => new Date())
+		.default(sql`(unixepoch() * 1000)`),
+});
+
 /**
  * Volumes Table
  */

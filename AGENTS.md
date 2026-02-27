@@ -1,5 +1,3 @@
-# AGENTS.md
-
 ## Important instructions
 
 - Never create migration files manually. Always use the provided command to generate migrations
@@ -62,3 +60,8 @@ bunx oxfmt format --write <path>
 # Lint
 bun run lint
 ```
+
+### Invalidation
+
+The frontend has an automatic invalidation setup which runs after every mutation.
+Do not implement any invalidation logic in the frontend.
