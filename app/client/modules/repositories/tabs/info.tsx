@@ -14,6 +14,7 @@ import {
 	AlertDialogTitle,
 } from "~/client/components/ui/alert-dialog";
 import type { Repository } from "~/client/lib/types";
+import type { GetRepositoryStatsResponse } from "~/client/api-client/types.gen";
 import { formatDateTime, formatTimeAgo } from "~/client/lib/datetime";
 import {
 	cancelDoctorMutation,
@@ -30,6 +31,7 @@ import { cn } from "~/client/lib/utils";
 
 type Props = {
 	repository: Repository;
+	initialStats?: GetRepositoryStatsResponse;
 };
 
 const getEffectiveLocalPath = (repository: Repository): string | null => {
@@ -37,7 +39,7 @@ const getEffectiveLocalPath = (repository: Repository): string | null => {
 	return repository.config.path;
 };
 
-export const RepositoryInfoTabContent = ({ repository }: Props) => {
+export const RepositoryInfoTabContent = ({ repository, initialStats }: Props) => {
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const navigate = useNavigate();
 
@@ -232,7 +234,7 @@ export const RepositoryInfoTabContent = ({ repository }: Props) => {
 
 					<DoctorReport repositoryStatus={repository.status} result={repository.doctorResult} />
 				</Card>
-				<CompressionStatsChart repositoryShortId={repository.shortId} />
+				<CompressionStatsChart repositoryShortId={repository.shortId} initialStats={initialStats} />
 			</div>
 
 			<AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { type } from "arktype";
 import {
 	getRepositoryOptions,
+	getRepositoryStatsOptions,
 	listBackupSchedulesOptions,
 	listSnapshotsOptions,
 } from "~/client/api-client/@tanstack/react-query.gen";
@@ -14,17 +15,20 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/")
 	loader: async ({ params, context }) => {
 		const snapshotOptions = listSnapshotsOptions({ path: { shortId: params.repositoryId } });
 		const schedulesOptions = listBackupSchedulesOptions();
+		const statsOptions = getRepositoryStatsOptions({ path: { shortId: params.repositoryId } });
 
 		const [res] = await Promise.all([
 			context.queryClient.ensureQueryData(getRepositoryOptions({ path: { shortId: params.repositoryId } })),
 			prefetchOrSkip(context.queryClient, snapshotOptions),
 			prefetchOrSkip(context.queryClient, schedulesOptions),
+			prefetchOrSkip(context.queryClient, statsOptions),
 		]);
 
 		return {
 			...res,
 			snapshots: context.queryClient.getQueryData(snapshotOptions.queryKey),
 			backupSchedules: context.queryClient.getQueryData(schedulesOptions.queryKey),
+			stats: context.queryClient.getQueryData(statsOptions.queryKey),
 		};
 	},
 	validateSearch: type({ tab: "string?" }),
@@ -47,13 +51,14 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/")
 
 function RouteComponent() {
 	const { repositoryId } = Route.useParams();
-	const { snapshots, backupSchedules } = Route.useLoaderData();
+	const { snapshots, backupSchedules, stats } = Route.useLoaderData();
 
 	return (
 		<RepositoryDetailsPage
 			repositoryId={repositoryId}
 			initialSnapshots={snapshots}
 			initialBackupSchedules={backupSchedules}
+			initialStats={stats}
 		/>
 	);
 }

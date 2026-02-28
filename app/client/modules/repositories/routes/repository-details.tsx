@@ -6,15 +6,18 @@ import { RepositoryInfoTabContent } from "../tabs/info";
 import { RepositorySnapshotsTabContent } from "../tabs/snapshots";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import type { BackupSchedule, Snapshot } from "~/client/lib/types";
+import type { GetRepositoryStatsResponse } from "~/client/api-client/types.gen";
 
 export default function RepositoryDetailsPage({
 	repositoryId,
 	initialSnapshots,
 	initialBackupSchedules,
+	initialStats,
 }: {
 	repositoryId: string;
 	initialSnapshots?: Snapshot[];
 	initialBackupSchedules?: BackupSchedule[];
+	initialStats?: GetRepositoryStatsResponse;
 }) {
 	const navigate = useNavigate();
 	const { tab } = useSearch({ from: "/(dashboard)/repositories/$repositoryId/" });
@@ -32,7 +35,7 @@ export default function RepositoryDetailsPage({
 					<TabsTrigger value="snapshots">Snapshots</TabsTrigger>
 				</TabsList>
 				<TabsContent value="info">
-					<RepositoryInfoTabContent repository={data} />
+					<RepositoryInfoTabContent repository={data} initialStats={initialStats} />
 				</TabsContent>
 				<TabsContent value="snapshots">
 					<Suspense>

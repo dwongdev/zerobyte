@@ -3,9 +3,11 @@ import { Archive } from "lucide-react";
 import { getRepositoryStatsOptions } from "~/client/api-client/@tanstack/react-query.gen";
 import { ByteSize } from "~/client/components/bytes-size";
 import { Card, CardContent, CardHeader, CardTitle } from "~/client/components/ui/card";
+import type { GetRepositoryStatsResponse } from "~/client/api-client/types.gen";
 
 type Props = {
 	repositoryShortId: string;
+	initialStats?: GetRepositoryStatsResponse;
 };
 
 const toSafeNumber = (value: number | undefined) => {
@@ -16,14 +18,15 @@ const toSafeNumber = (value: number | undefined) => {
 	return Math.max(0, value);
 };
 
-export function CompressionStatsChart({ repositoryShortId }: Props) {
+export function CompressionStatsChart({ repositoryShortId, initialStats }: Props) {
 	const {
 		data: stats,
-		isLoading,
+		isPending,
 		error,
 	} = useQuery({
 		...getRepositoryStatsOptions({ path: { shortId: repositoryShortId } }),
 		retry: false,
+		initialData: initialStats,
 	});
 
 	const storedSize = toSafeNumber(stats?.total_size);
@@ -40,7 +43,7 @@ export function CompressionStatsChart({ repositoryShortId }: Props) {
 
 	const hasStats = !!stats && (storedSize > 0 || uncompressedSize > 0 || snapshotsCount > 0);
 
-	if (isLoading) {
+	if (isPending) {
 		return (
 			<Card className="p-6">
 				<p className="text-sm text-muted-foreground">Loading compression statistics...</p>
