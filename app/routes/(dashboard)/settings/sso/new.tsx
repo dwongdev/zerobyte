@@ -8,7 +8,7 @@ export const Route = createFileRoute("/(dashboard)/settings/sso/new")({
 		const orgContext = await getOrganizationContext();
 		const role = orgContext.activeMember?.role;
 
-		if (role !== "owner" && role !== "admin") {
+		if (role !== "owner") {
 			throw redirect({ to: "/settings" });
 		}
 	},
