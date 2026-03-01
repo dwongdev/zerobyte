@@ -7,11 +7,13 @@ import {
 	type User,
 } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin, createAuthMiddleware, twoFactor, username, organization } from "better-auth/plugins";
+import { admin, twoFactor, username, organization, testUtils } from "better-auth/plugins";
+import { createAuthMiddleware } from "better-auth/api";
 import { sso } from "@better-auth/sso";
 import { config } from "../core/config";
 import { db } from "../db/db";
 import { cryptoUtils } from "../utils/crypto";
+import { logger } from "../utils/logger";
 import { authService } from "../modules/auth/auth.service";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { isValidUsername, normalizeUsername } from "~/lib/username";
@@ -21,13 +23,24 @@ import { validateSsoCallbackUrls } from "./auth/middlewares/validate-sso-callbac
 import { validateSsoProviderId } from "./auth/middlewares/validate-sso-provider-id";
 import { createUserDefaultOrg } from "./auth/helpers/create-default-org";
 import { isSsoCallbackRequest, requireSsoInvitation } from "./auth/middlewares/require-sso-invitation";
-import { ssoTrustedProviderLinkingPlugin } from "./auth/plugins/sso-trusted-provider-linking";
+import { resolveTrustedProvidersForRequest } from "./auth/middlewares/trust-sso-provider-for-linking";
+import { buildAllowedHosts } from "./auth/base-url";
 
 export type AuthMiddlewareContext = MiddlewareContext<MiddlewareOptions, AuthContext<BetterAuthOptions>>;
 
+const authOrigins = [config.baseUrl, ...config.trustedOrigins];
+const { allowedHosts, invalidOrigins } = buildAllowedHosts(authOrigins);
+
+for (const origin of invalidOrigins) {
+	logger.warn(`Ignoring invalid auth origin in configuration: ${origin}`);
+}
+
 export const auth = betterAuth({
 	secret: await cryptoUtils.deriveSecret("better-auth"),
-	baseURL: config.baseUrl,
+	baseURL: {
+		allowedHosts,
+		protocol: "auto",
+	},
 	trustedOrigins: config.trustedOrigins,
 	advanced: {
 		cookiePrefix: "zerobyte",
@@ -91,6 +104,7 @@ export const auth = betterAuth({
 	account: {
 		accountLinking: {
 			enabled: true,
+			trustedProviders: resolveTrustedProvidersForRequest,
 		},
 	},
 	user: {
@@ -132,7 +146,6 @@ export const auth = betterAuth({
 				defaultRole: "member",
 			},
 		}),
-		ssoTrustedProviderLinkingPlugin(),
 		twoFactor({
 			backupCodeOptions: {
 				storeBackupCodes: "encrypted",
@@ -140,5 +153,6 @@ export const auth = betterAuth({
 			},
 		}),
 		tanstackStartCookies(),
+		...(process.env.NODE_ENV === "test" ? [testUtils()] : []),
 	],
 });
