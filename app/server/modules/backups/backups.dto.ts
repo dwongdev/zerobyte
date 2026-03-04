@@ -29,6 +29,7 @@ const backupScheduleSchema = type({
 	excludeIfPresent: "string[] | null",
 	includePatterns: "string[] | null",
 	oneFileSystem: "boolean",
+	customResticParams: "string[] | null",
 	lastBackupAt: "number | null",
 	lastBackupStatus: "'success' | 'error' | 'in_progress' | 'warning' | null",
 	lastBackupError: "string | null",
@@ -136,6 +137,7 @@ export const createBackupScheduleBody = type({
 	includePatterns: "string[]?",
 	oneFileSystem: "boolean?",
 	tags: "string[]?",
+	customResticParams: "string[]?",
 });
 
 export type CreateBackupScheduleBody = typeof createBackupScheduleBody.infer;
@@ -174,6 +176,7 @@ export const updateBackupScheduleBody = type({
 	includePatterns: "string[]?",
 	oneFileSystem: "boolean?",
 	tags: "string[]?",
+	customResticParams: "string[]?",
 });
 
 export type UpdateBackupScheduleBody = typeof updateBackupScheduleBody.infer;

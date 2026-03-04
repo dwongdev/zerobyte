@@ -4,7 +4,9 @@ import { useForm } from "react-hook-form";
 import { useScrollToFormError } from "~/client/hooks/use-scroll-to-form-error";
 import { Form } from "~/client/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/client/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/client/components/ui/collapsible";
 import type { BackupSchedule, Volume } from "~/client/lib/types";
+import { AdvancedSection } from "./advanced-section";
 import { BasicInfoSection } from "./basic-info-section";
 import { ExcludeSection } from "./exclude-section";
 import { FrequencySection } from "./frequency-section";
@@ -39,6 +41,7 @@ export const CreateScheduleForm = ({ initialValues, formId, onSubmit, volume }: 
 				excludePatternsText,
 				excludeIfPresentText,
 				includePatternsText,
+				customResticParamsText,
 				includePatterns: fileBrowserPatterns,
 				cronExpression,
 				...rest
@@ -65,12 +68,20 @@ export const CreateScheduleForm = ({ initialValues, formId, onSubmit, volume }: 
 				: [];
 			const includePatterns = [...(fileBrowserPatterns || []), ...textPatterns];
 
+			const customResticParams = customResticParamsText
+				? customResticParamsText
+						.split("\n")
+						.map((p) => p.trim())
+						.filter(Boolean)
+				: [];
+
 			onSubmit({
 				...rest,
 				cronExpression,
 				includePatterns: includePatterns.length > 0 ? includePatterns : [],
 				excludePatterns,
 				excludeIfPresent,
+				customResticParams,
 			});
 		},
 		[onSubmit],
@@ -162,6 +173,17 @@ export const CreateScheduleForm = ({ initialValues, formId, onSubmit, volume }: 
 						</CardHeader>
 						<CardContent className="grid gap-4 @medium:grid-cols-2">
 							<RetentionSection form={form} />
+						</CardContent>
+					</Card>
+
+					<Card className="min-w-0 @container">
+						<CardContent>
+							<Collapsible>
+								<CollapsibleTrigger>Advanced</CollapsibleTrigger>
+								<CollapsibleContent className="pb-4 space-y-4">
+									<AdvancedSection form={form} />
+								</CollapsibleContent>
+							</Collapsible>
 						</CardContent>
 					</Card>
 				</div>
