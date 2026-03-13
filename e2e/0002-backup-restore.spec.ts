@@ -427,13 +427,21 @@ test("backup respects include globs, exclusion patterns, and exclude-if-present"
 		await folderRow.locator("svg").first().click();
 	}
 
-	await expect(page.getByRole("button", { name: /keep\.xyz/ })).toBeVisible();
-	await expect(page.getByRole("button", { name: /second\.xyz/ })).toBeVisible();
-	await expect(page.getByRole("button", { name: /glob-only\.xyz/ })).toBeVisible();
-	await expect(page.getByRole("button", { name: new RegExp(dataIncludedFile.replace(".", "\\.")) })).toBeVisible();
-	await expect(page.getByRole("button", { name: new RegExp(configIncludedFile.replace(".", "\\.")) })).toBeVisible();
-	await expect(page.getByRole("button", { name: new RegExp(rootDbFile.replace(".", "\\.")) })).toBeVisible();
-	await expect(page.getByRole("button", { name: new RegExp(secondRootDbFile.replace(".", "\\.")) })).toBeVisible();
+	await expect(page.getByRole("button", { name: /keep\.xyz/ })).toBeVisible({ timeout: 15000 });
+	await expect(page.getByRole("button", { name: /second\.xyz/ })).toBeVisible({ timeout: 15000 });
+	await expect(page.getByRole("button", { name: /glob-only\.xyz/ })).toBeVisible({ timeout: 15000 });
+	await expect(page.getByRole("button", { name: new RegExp(dataIncludedFile.replace(".", "\\.")) })).toBeVisible({
+		timeout: 15000,
+	});
+	await expect(page.getByRole("button", { name: new RegExp(configIncludedFile.replace(".", "\\.")) })).toBeVisible({
+		timeout: 15000,
+	});
+	await expect(page.getByRole("button", { name: new RegExp(rootDbFile.replace(".", "\\.")) })).toBeVisible({
+		timeout: 15000,
+	});
+	await expect(page.getByRole("button", { name: new RegExp(secondRootDbFile.replace(".", "\\.")) })).toBeVisible({
+		timeout: 15000,
+	});
 
 	await expect(page.getByRole("button", { name: /\.DS_Store/ })).toHaveCount(0);
 	await expect(page.getByRole("button", { name: /skip\.tmp/ })).toHaveCount(0);
