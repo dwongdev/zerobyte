@@ -2,6 +2,14 @@ import type { BackupSchedule } from "~/client/lib/types";
 import { cronToFormValues } from "../../lib/cron-utils";
 import type { InternalFormValues } from "./types";
 
+export const parseMultilineEntries = (value?: string) =>
+	value
+		? value
+				.split("\n")
+				.map((entry) => entry.trim())
+				.filter(Boolean)
+		: [];
+
 export const backupScheduleToFormValues = (schedule?: BackupSchedule): InternalFormValues | undefined => {
 	if (!schedule) {
 		return undefined;

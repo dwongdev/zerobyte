@@ -14,7 +14,7 @@ import { PathsSection } from "./paths-section";
 import { RetentionSection } from "./retention-section";
 import { SummarySection } from "./summary-section";
 import { internalFormSchema, type BackupScheduleFormValues, type InternalFormValues } from "./types";
-import { backupScheduleToFormValues } from "./utils";
+import { backupScheduleToFormValues, parseMultilineEntries } from "./utils";
 
 export type { BackupScheduleFormValues };
 
@@ -46,34 +46,11 @@ export const CreateScheduleForm = ({ initialValues, formId, onSubmit, volume }: 
 				cronExpression,
 				...rest
 			} = data;
-			const excludePatterns = excludePatternsText
-				? excludePatternsText
-						.split("\n")
-						.map((p) => p.trim())
-						.filter(Boolean)
-				: [];
-
-			const excludeIfPresent = excludeIfPresentText
-				? excludeIfPresentText
-						.split("\n")
-						.map((p) => p.trim())
-						.filter(Boolean)
-				: [];
-
-			const textPatterns = includePatternsText
-				? includePatternsText
-						.split("\n")
-						.map((p) => p.trim())
-						.filter(Boolean)
-				: [];
+			const excludePatterns = parseMultilineEntries(excludePatternsText);
+			const excludeIfPresent = parseMultilineEntries(excludeIfPresentText);
+			const textPatterns = parseMultilineEntries(includePatternsText);
 			const includePatterns = [...(fileBrowserPatterns || []), ...textPatterns];
-
-			const customResticParams = customResticParamsText
-				? customResticParamsText
-						.split("\n")
-						.map((p) => p.trim())
-						.filter(Boolean)
-				: [];
+			const customResticParams = parseMultilineEntries(customResticParamsText);
 
 			onSubmit({
 				...rest,
