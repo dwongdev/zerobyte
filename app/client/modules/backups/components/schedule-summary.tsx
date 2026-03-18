@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { handleRepositoryError } from "~/client/lib/errors";
 import { formatShortDateTime, formatTimeAgo } from "~/client/lib/datetime";
 import { Link } from "@tanstack/react-router";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/client/components/ui/collapsible";
+import { cn } from "~/client/lib/utils";
 
 type Props = {
 	schedule: BackupSchedule;
@@ -198,22 +200,41 @@ export const ScheduleSummary = (props: Props) => {
 						</p>
 					</div>
 
-					{schedule.lastBackupStatus === "warning" && (
+					{(schedule.lastBackupStatus === "warning" || schedule.lastBackupStatus === "error") && (
 						<div className="@medium:col-span-2 @wide:col-span-4">
-							<p className="text-xs uppercase text-muted-foreground">Warning Details</p>
-							<p className="font-mono text-sm text-yellow-600 whitespace-pre-wrap wrap-break-word">
-								{schedule.lastBackupError ??
-									"Last backup completed with warnings. Check your container logs for more details."}
-							</p>
-						</div>
-					)}
-
-					{schedule.lastBackupError && schedule.lastBackupStatus === "error" && (
-						<div className="@medium:col-span-2 @wide:col-span-4">
-							<p className="text-xs uppercase text-muted-foreground">Error details</p>
-							<p className="font-mono text-sm text-red-600 whitespace-pre-wrap wrap-break-word">
-								{schedule.lastBackupError}
-							</p>
+							<Collapsible
+								className={cn("border border-border/50 rounded-lg overflow-hidden", {
+									"border-yellow-500/20 bg-yellow-500/5": schedule.lastBackupStatus === "warning",
+									"border-red-500/20 bg-red-500/5": schedule.lastBackupStatus === "error",
+								})}
+							>
+								<CollapsibleTrigger
+									className={cn("w-full justify-start p-3 hover:bg-muted/50 transition-colors", {
+										"hover:bg-yellow-500/10": schedule.lastBackupStatus === "warning",
+										"hover:bg-red-500/10": schedule.lastBackupStatus === "error",
+									})}
+								>
+									<span>{schedule.lastBackupStatus === "warning" ? "Warning details" : "Error details"}</span>
+								</CollapsibleTrigger>
+								<CollapsibleContent
+									className={cn("border-t border-border/50 bg-muted/30", {
+										"border-yellow-500/20 bg-yellow-500/8": schedule.lastBackupStatus === "warning",
+										"border-red-500/20 bg-red-500/8": schedule.lastBackupStatus === "error",
+									})}
+								>
+									<div className="p-3">
+										<p
+											className={cn("font-mono text-sm whitespace-pre-wrap wrap-break-word", {
+												"text-yellow-600": schedule.lastBackupStatus === "warning",
+												"text-red-600": schedule.lastBackupStatus === "error",
+											})}
+										>
+											{schedule.lastBackupError ??
+												"No additional details available. check your container logs for more information."}
+										</p>
+									</div>
+								</CollapsibleContent>
+							</Collapsible>
 						</div>
 					)}
 				</CardContent>
