@@ -42,12 +42,12 @@ const mount = async (config: BackendConfig, path: string) => {
 		const options = [`port=${config.port}`, `uid=${uid}`, `gid=${gid}`];
 
 		if (config.guest) {
-			options.push("user=guest", "pass=");
+			options.push("username=guest", "password=");
 		} else {
 			const password = await cryptoUtils.resolveSecret(config.password ?? "");
 			const safePassword = password.replace(/\\/g, "\\\\").replace(/,/g, "\\,");
 
-			options.push(`user=${config.username ?? "user"}`, `pass=${safePassword}`);
+			options.push(`username=${config.username ?? "user"}`, `password=${safePassword}`);
 		}
 
 		if (config.domain) {
