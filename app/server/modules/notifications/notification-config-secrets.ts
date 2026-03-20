@@ -37,6 +37,7 @@ export const mapNotificationConfigSecrets = async (config: NotificationConfig, t
 			return {
 				...config,
 				password: await transformOptionalSecret(config.password, transformSecret),
+				accessToken: await transformOptionalSecret(config.accessToken, transformSecret),
 			};
 		case "pushover":
 			return {
