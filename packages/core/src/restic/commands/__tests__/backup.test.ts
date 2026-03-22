@@ -322,14 +322,14 @@ describe("backup command", () => {
 			);
 		});
 
-		test("returns { result: null } when the abort signal is triggered", async () => {
+		test("returns the manual-stop warning details when the abort signal is triggered", async () => {
 			const controller = new AbortController();
 			setup({
 				onSpawnCall: () => controller.abort(),
 				spawnResult: { exitCode: 130, summary: "", error: "" },
 			});
 
-			const { result, exitCode } = await backup(
+			const { result, exitCode, warningDetails } = await backup(
 				config,
 				"/mnt/data",
 				{
@@ -341,6 +341,7 @@ describe("backup command", () => {
 
 			expect(result).toBeNull();
 			expect(exitCode).toBe(130);
+			expect(warningDetails).toBe("Backup was stopped by the user");
 		});
 	});
 
