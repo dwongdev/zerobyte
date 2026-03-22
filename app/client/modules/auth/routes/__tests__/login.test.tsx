@@ -6,24 +6,8 @@ await mock.module("@tanstack/react-router", () => ({
 	useNavigate: () => mock(() => {}),
 }));
 
-await mock.module("~/client/api-client/@tanstack/react-query.gen", () => ({
-	getPublicSsoProvidersOptions: () => ({
-		queryKey: ["public-sso-providers"],
-		queryFn: async () => ({ providers: [] }),
-	}),
-}));
-
-await mock.module("~/client/lib/auth-client", () => ({
-	authClient: {
-		getSession: mock(async () => ({ data: null })),
-		signIn: {
-			username: mock(async () => ({ data: null, error: null })),
-			sso: mock(async () => ({ data: null, error: null })),
-		},
-		twoFactor: {
-			verifyTotp: mock(async () => ({ data: null, error: null })),
-		},
-	},
+await mock.module("~/client/modules/sso/components/sso-login-section", () => ({
+	SsoLoginSection: () => null,
 }));
 
 import { LoginPage } from "../login";

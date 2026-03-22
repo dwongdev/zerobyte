@@ -1,7 +1,43 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: Testing file - non-null assertions are acceptable here */
 import { expect, test, describe } from "bun:test";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { useState } from "react";
 import { FileTree, type FileEntry } from "../file-tree";
+
+const getCheckboxFor = (name: string) => {
+	const row = screen.getByRole("button", { name });
+	return within(row).getByRole("checkbox");
+};
+
+const FileTreeSelection = ({
+	files,
+	initialSelectedPaths = [],
+	expandedFolders,
+}: {
+	files: FileEntry[];
+	initialSelectedPaths?: string[];
+	expandedFolders?: Set<string>;
+}) => {
+	const [selectedPaths, setSelectedPaths] = useState(() => new Set(initialSelectedPaths));
+
+	return (
+		<>
+			<FileTree
+				files={files}
+				withCheckboxes={true}
+				selectedPaths={selectedPaths}
+				onSelectionChange={setSelectedPaths}
+				expandedFolders={expandedFolders}
+			/>
+			<output aria-label="Selected paths">{JSON.stringify(Array.from(selectedPaths).sort())}</output>
+		</>
+	);
+};
+
+const getSelectedPaths = () => {
+	const selectedPaths = screen.getByLabelText("Selected paths").textContent;
+	return JSON.parse(selectedPaths ?? "[]") as string[];
+};
 
 describe("FileTree Pagination", () => {
 	const testFiles: FileEntry[] = [
@@ -157,154 +193,67 @@ describe("FileTree Selection Logic", () => {
 		{ name: "upload", path: "/root/photos/upload", type: "folder" },
 	];
 
-	test("selecting a folder simplifies to parent if it's the only child", async () => {
-		let currentSelection = new Set<string>();
-		const onSelectionChange = (selection: Set<string>) => {
-			currentSelection = selection;
-		};
+	test("selecting a folder simplifies to parent if it's the only child", () => {
+		render(<FileTreeSelection files={testFiles} expandedFolders={new Set(testFiles.map((f) => f.path))} />);
 
-		render(
-			<FileTree
-				files={testFiles}
-				withCheckboxes={true}
-				selectedPaths={currentSelection}
-				onSelectionChange={onSelectionChange}
-				expandedFolders={new Set(testFiles.map((f) => f.path))}
-			/>,
-		);
+		fireEvent.click(getCheckboxFor("photos"));
 
-		const photosCheckbox = screen.getByText("photos").parentElement?.querySelector('button[role="checkbox"]');
-		expect(photosCheckbox).toBeTruthy();
-
-		fireEvent.click(photosCheckbox!);
-
-		expect(currentSelection.has("/root")).toBe(true);
-		expect(currentSelection.size).toBe(1);
+		expect(getSelectedPaths()).toEqual(["/root"]);
 	});
 
-	test("unselecting a child removes the parent from selection", async () => {
-		let currentSelection = new Set<string>(["/root"]);
-		const onSelectionChange = (selection: Set<string>) => {
-			currentSelection = selection;
-		};
-
+	test("unselecting a child removes the parent from selection", () => {
 		render(
-			<FileTree
+			<FileTreeSelection
 				files={testFiles}
-				withCheckboxes={true}
-				selectedPaths={currentSelection}
-				onSelectionChange={onSelectionChange}
+				initialSelectedPaths={["/root"]}
 				expandedFolders={new Set(testFiles.map((f) => f.path))}
 			/>,
 		);
 
-		const libraryCheckbox = screen.getByText("library").parentElement?.querySelector('button[role="checkbox"]');
-		fireEvent.click(libraryCheckbox!);
+		fireEvent.click(getCheckboxFor("library"));
 
-		expect(currentSelection.has("/root")).toBe(false);
-		expect(currentSelection.has("/root/photos")).toBe(false);
-
-		expect(currentSelection.has("/root/photos/backups")).toBe(true);
-		expect(currentSelection.has("/root/photos/profile")).toBe(true);
-		expect(currentSelection.has("/root/photos/upload")).toBe(true);
-		expect(currentSelection.size).toBe(3);
+		expect(getSelectedPaths()).toEqual(["/root/photos/backups", "/root/photos/profile", "/root/photos/upload"]);
 	});
 
-	test("recursive simplification when all children are selected", async () => {
-		let currentSelection = new Set<string>();
-		const onSelectionChange = (selection: Set<string>) => {
-			currentSelection = selection;
-		};
-
-		const { rerender } = render(
-			<FileTree
-				files={testFiles}
-				withCheckboxes={true}
-				selectedPaths={currentSelection}
-				onSelectionChange={onSelectionChange}
-				expandedFolders={new Set(testFiles.map((f) => f.path))}
-			/>,
-		);
+	test("recursive simplification when all children are selected", () => {
+		render(<FileTreeSelection files={testFiles} expandedFolders={new Set(testFiles.map((f) => f.path))} />);
 
 		const children = ["backups", "library", "profile", "upload"];
 
 		for (const name of children) {
-			const checkbox = screen.getByText(name).parentElement?.querySelector('button[role="checkbox"]');
-			fireEvent.click(checkbox!);
-
-			rerender(
-				<FileTree
-					files={testFiles}
-					withCheckboxes={true}
-					selectedPaths={currentSelection}
-					onSelectionChange={onSelectionChange}
-					expandedFolders={new Set(testFiles.map((f) => f.path))}
-				/>,
-			);
+			fireEvent.click(getCheckboxFor(name));
 		}
 
-		expect(currentSelection.has("/root")).toBe(true);
-		expect(currentSelection.size).toBe(1);
+		expect(getSelectedPaths()).toEqual(["/root"]);
 	});
 
-	test("does not simplify to parent if not all children are selected", async () => {
+	test("does not simplify to parent if not all children are selected", () => {
 		const multipleFiles: FileEntry[] = [
 			{ name: "root", path: "/root", type: "folder" },
 			{ name: "child1", path: "/root/child1", type: "folder" },
 			{ name: "child2", path: "/root/child2", type: "folder" },
 		];
 
-		let currentSelection = new Set<string>();
-		const onSelectionChange = (selection: Set<string>) => {
-			currentSelection = selection;
-		};
+		render(<FileTreeSelection files={multipleFiles} expandedFolders={new Set(multipleFiles.map((f) => f.path))} />);
 
-		render(
-			<FileTree
-				files={multipleFiles}
-				withCheckboxes={true}
-				selectedPaths={currentSelection}
-				onSelectionChange={onSelectionChange}
-				expandedFolders={new Set(multipleFiles.map((f) => f.path))}
-			/>,
-		);
+		fireEvent.click(getCheckboxFor("child1"));
 
-		const child1Checkbox = screen.getByText("child1").parentElement?.querySelector('button[role="checkbox"]');
-		fireEvent.click(child1Checkbox!);
-
-		expect(currentSelection.has("/root/child1")).toBe(true);
-		expect(currentSelection.has("/root")).toBe(false);
-		expect(currentSelection.size).toBe(1);
+		expect(getSelectedPaths()).toEqual(["/root/child1"]);
 	});
 
-	test("simplifies existing deep paths when parent is selected", async () => {
+	test("simplifies existing deep paths when parent is selected", () => {
 		const files: FileEntry[] = [
 			{ name: "hello", path: "/hello", type: "folder" },
 			{ name: "hello_prev", path: "/hello_prev", type: "folder" },
 			{ name: "service", path: "/service", type: "folder" },
 		];
 
-		let currentSelection = new Set<string>(["/hello", "/hello_prev", "/service/app/data/upload"]);
-		const onSelectionChange = (selection: Set<string>) => {
-			currentSelection = selection;
-		};
-
 		render(
-			<FileTree
-				files={files}
-				withCheckboxes={true}
-				selectedPaths={currentSelection}
-				onSelectionChange={onSelectionChange}
-			/>,
+			<FileTreeSelection files={files} initialSelectedPaths={["/hello", "/hello_prev", "/service/app/data/upload"]} />,
 		);
 
-		const serviceCheckbox = screen.getByText("service").parentElement?.querySelector('button[role="checkbox"]');
-		expect(serviceCheckbox).toBeTruthy();
+		fireEvent.click(getCheckboxFor("service"));
 
-		fireEvent.click(serviceCheckbox!);
-
-		expect(currentSelection.has("/service")).toBe(true);
-		expect(currentSelection.has("/service/app/data/upload")).toBe(false);
-		expect(currentSelection.size).toBe(3); // /hello, /hello_prev, /service
+		expect(getSelectedPaths()).toEqual(["/hello", "/hello_prev", "/service"]);
 	});
 });
