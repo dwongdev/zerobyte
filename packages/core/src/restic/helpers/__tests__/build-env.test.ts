@@ -317,11 +317,11 @@ describe("buildEnv", () => {
 			expect(env._SFTP_SSH_ARGS).toContain("UserKnownHostsFile=/dev/null");
 		});
 
-		test("uses StrictHostKeyChecking=no when knownHosts is absent", async () => {
+		test("uses StrictHostKeyChecking=yes when knownHosts is absent", async () => {
 			const env = await buildEnvForTest({ ...baseSftpConfig, skipHostKeyCheck: false, knownHosts: undefined }, "org-1");
 
-			expect(env._SFTP_SSH_ARGS).toContain("StrictHostKeyChecking=no");
-			expect(env._SFTP_SSH_ARGS).toContain("UserKnownHostsFile=/dev/null");
+			expect(env._SFTP_SSH_ARGS).toContain("StrictHostKeyChecking=yes");
+			expect(env._SFTP_SSH_ARGS).not.toContain("UserKnownHostsFile=/dev/null");
 		});
 
 		test("uses StrictHostKeyChecking=yes and a known hosts file when knownHosts is provided", async () => {

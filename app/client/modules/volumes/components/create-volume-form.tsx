@@ -32,14 +32,24 @@ import { useSystemInfo } from "~/client/hooks/use-system-info";
 import { useScrollToFormError } from "~/client/hooks/use-scroll-to-form-error";
 import { DirectoryForm, NFSForm, SMBForm, WebDAVForm, RcloneForm, SFTPForm } from "./volume-forms";
 
-export const formSchema = z.discriminatedUnion("backend", [
-	directoryConfigSchema.extend({ name: z.string().min(2).max(32) }),
-	nfsConfigSchema.extend({ name: z.string().min(2).max(32) }),
-	smbConfigSchema.extend({ name: z.string().min(2).max(32) }),
-	webdavConfigSchema.extend({ name: z.string().min(2).max(32) }),
-	rcloneConfigSchema.extend({ name: z.string().min(2).max(32) }),
-	sftpConfigSchema.extend({ name: z.string().min(2).max(32) }),
-]);
+export const formSchema = z
+	.discriminatedUnion("backend", [
+		directoryConfigSchema.extend({ name: z.string().min(2).max(32) }),
+		nfsConfigSchema.extend({ name: z.string().min(2).max(32) }),
+		smbConfigSchema.extend({ name: z.string().min(2).max(32) }),
+		webdavConfigSchema.extend({ name: z.string().min(2).max(32) }),
+		rcloneConfigSchema.extend({ name: z.string().min(2).max(32) }),
+		sftpConfigSchema.extend({ name: z.string().min(2).max(32) }),
+	])
+	.superRefine((value, ctx) => {
+		if (value.backend === "sftp" && !value.skipHostKeyCheck && !value.knownHosts?.trim()) {
+			ctx.addIssue({
+				code: "custom",
+				message: "Known hosts are required unless host key verification is skipped",
+				path: ["knownHosts"],
+			});
+		}
+	});
 
 export type FormValues = z.input<typeof formSchema>;
 

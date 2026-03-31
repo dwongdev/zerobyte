@@ -52,16 +52,26 @@ const formBaseFields = {
 	compressionMode: z.enum(COMPRESSION_MODES).optional(),
 };
 
-export const formSchema = z.discriminatedUnion("backend", [
-	localRepositoryConfigSchema.extend(formBaseFields),
-	s3RepositoryConfigSchema.extend(formBaseFields),
-	r2RepositoryConfigSchema.extend(formBaseFields),
-	gcsRepositoryConfigSchema.extend(formBaseFields),
-	azureRepositoryConfigSchema.extend(formBaseFields),
-	rcloneRepositoryConfigSchema.extend(formBaseFields),
-	restRepositoryConfigSchema.extend(formBaseFields),
-	sftpRepositoryConfigSchema.extend(formBaseFields),
-]);
+export const formSchema = z
+	.discriminatedUnion("backend", [
+		localRepositoryConfigSchema.extend(formBaseFields),
+		s3RepositoryConfigSchema.extend(formBaseFields),
+		r2RepositoryConfigSchema.extend(formBaseFields),
+		gcsRepositoryConfigSchema.extend(formBaseFields),
+		azureRepositoryConfigSchema.extend(formBaseFields),
+		rcloneRepositoryConfigSchema.extend(formBaseFields),
+		restRepositoryConfigSchema.extend(formBaseFields),
+		sftpRepositoryConfigSchema.extend(formBaseFields),
+	])
+	.superRefine((value, ctx) => {
+		if (value.backend === "sftp" && !value.skipHostKeyCheck && !value.knownHosts?.trim()) {
+			ctx.addIssue({
+				code: "custom",
+				message: "Known hosts are required unless host key verification is skipped",
+				path: ["knownHosts"],
+			});
+		}
+	});
 
 export type RepositoryFormValues = z.input<typeof formSchema>;
 

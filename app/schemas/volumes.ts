@@ -82,7 +82,7 @@ export const sftpConfigSchema = z.object({
 	privateKey: z.string().optional(),
 	path: z.string().min(1),
 	readOnly: z.boolean().optional(),
-	skipHostKeyCheck: z.boolean().default(true),
+	skipHostKeyCheck: z.boolean().default(false),
 	knownHosts: z.string().optional(),
 });
 

@@ -116,7 +116,7 @@ export const sftpRepositoryConfigSchema = z
 		user: z.string().min(1),
 		path: z.string().min(1),
 		privateKey: z.string().min(1),
-		skipHostKeyCheck: z.boolean().default(true),
+		skipHostKeyCheck: z.boolean().default(false),
 		knownHosts: z.string().optional(),
 	})
 	.extend(baseRepositoryConfigSchema.shape);

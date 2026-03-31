@@ -114,13 +114,15 @@ export const buildEnv = async (
 				keyPath,
 			];
 
-			if (config.skipHostKeyCheck || !config.knownHosts) {
+			if (config.skipHostKeyCheck) {
 				sshArgs.push("-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null");
 			} else if (config.knownHosts) {
 				const knownHostsPath = path.join("/tmp", `zerobyte-known-hosts-${crypto.randomBytes(8).toString("hex")}`);
 				await writeFileWithMode(knownHostsPath, config.knownHosts, FILE_MODES.ownerReadWrite);
 				env._SFTP_KNOWN_HOSTS_PATH = knownHostsPath;
 				sshArgs.push("-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${knownHostsPath}`);
+			} else {
+				sshArgs.push("-o", "StrictHostKeyChecking=yes");
 			}
 
 			if (config.port && config.port !== 22) {

@@ -60,12 +60,14 @@ const mount = async (config: BackendConfig, mountPath: string) => {
 			`gid=${gid}`,
 		];
 
-		if (config.skipHostKeyCheck || !config.knownHosts) {
+		if (config.skipHostKeyCheck) {
 			options.push("StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null");
 		} else if (config.knownHosts) {
 			const knownHostsPath = getKnownHostsPath(mountPath);
 			await writeFileWithMode(knownHostsPath, config.knownHosts, FILE_MODES.ownerReadWrite);
 			options.push(`UserKnownHostsFile=${knownHostsPath}`, "StrictHostKeyChecking=yes");
+		} else {
+			options.push("StrictHostKeyChecking=yes");
 		}
 
 		if (config.readOnly) {
