@@ -114,20 +114,25 @@ export const FileTree = memo((props: Props) => {
 
 	const toggleCollapseState = useCallback(
 		(fullPath: string) => {
+			const shouldExpand = collapsedFolders.has(fullPath);
+
 			setCollapsedFolders((prevSet) => {
 				const newSet = new Set(prevSet);
 
 				if (newSet.has(fullPath)) {
 					newSet.delete(fullPath);
-					onFolderExpand?.(fullPath);
 				} else {
 					newSet.add(fullPath);
 				}
 
 				return newSet;
 			});
+
+			if (shouldExpand) {
+				onFolderExpand?.(fullPath);
+			}
 		},
-		[onFolderExpand],
+		[collapsedFolders, onFolderExpand],
 	);
 
 	// Add new folders to collapsed set when file list changes

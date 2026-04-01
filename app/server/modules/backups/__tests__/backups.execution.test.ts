@@ -218,12 +218,24 @@ describe("stop backup", () => {
 			repositoryId: repository.id,
 		});
 
-		resticBackupMock.mockImplementation(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 500));
-			return { exitCode: 0, summary: generateBackupOutput(), error: "" };
+		resticBackupMock.mockImplementation(({ signal }: SafeSpawnParams) => {
+			return new Promise((resolve) => {
+				if (signal?.aborted) {
+					resolve({ exitCode: 1, summary: "", error: "" });
+					return;
+				}
+
+				signal?.addEventListener(
+					"abort",
+					() => {
+						resolve({ exitCode: 1, summary: "", error: "" });
+					},
+					{ once: true },
+				);
+			});
 		});
 
-		void backupsExecutionService.executeBackup(schedule.id);
+		const executePromise = backupsExecutionService.executeBackup(schedule.id);
 
 		await waitForExpect(async () => {
 			const runningSchedule = await backupsService.getScheduleById(schedule.id);
@@ -232,6 +244,7 @@ describe("stop backup", () => {
 
 		// act
 		await backupsExecutionService.stopBackup(schedule.id);
+		await executePromise;
 
 		// assert
 		const updatedSchedule = await backupsService.getScheduleById(schedule.id);
@@ -248,30 +261,39 @@ describe("stop backup", () => {
 			repositoryId: repository.id,
 		});
 
-		const releaseLock = await repoMutex.acquireExclusive(repository.id, "test");
+		spyOn(repoMutex, "acquireShared").mockImplementation((_repositoryId, _operation, signal) => {
+			return new Promise((_, reject) => {
+				if (signal?.aborted) {
+					reject(signal.reason instanceof Error ? signal.reason : new Error("Operation aborted"));
+					return;
+				}
 
-		try {
-			const executePromise = backupsExecutionService.executeBackup(schedule.id);
-
-			await waitForExpect(async () => {
-				const queuedSchedule = await backupsService.getScheduleById(schedule.id);
-				expect(queuedSchedule.lastBackupStatus).toBe("in_progress");
+				signal?.addEventListener(
+					"abort",
+					() => {
+						reject(signal.reason instanceof Error ? signal.reason : new Error("Operation aborted"));
+					},
+					{ once: true },
+				);
 			});
+		});
 
-			expect(resticBackupMock).not.toHaveBeenCalled();
+		const executePromise = backupsExecutionService.executeBackup(schedule.id);
 
-			await backupsExecutionService.stopBackup(schedule.id);
-			releaseLock();
+		await waitForExpect(async () => {
+			const queuedSchedule = await backupsService.getScheduleById(schedule.id);
+			expect(queuedSchedule.lastBackupStatus).toBe("in_progress");
+		});
 
-			await executePromise;
+		expect(resticBackupMock).not.toHaveBeenCalled();
 
-			const updatedSchedule = await backupsService.getScheduleById(schedule.id);
-			expect(updatedSchedule.lastBackupStatus).toBe("warning");
-			expect(updatedSchedule.lastBackupError).toBe("Backup was stopped by the user");
-			expect(resticBackupMock).not.toHaveBeenCalled();
-		} finally {
-			releaseLock();
-		}
+		await backupsExecutionService.stopBackup(schedule.id);
+		await executePromise;
+
+		const updatedSchedule = await backupsService.getScheduleById(schedule.id);
+		expect(updatedSchedule.lastBackupStatus).toBe("warning");
+		expect(updatedSchedule.lastBackupError).toBe("Backup was stopped by the user");
+		expect(resticBackupMock).not.toHaveBeenCalled();
 	});
 
 	test("should throw ConflictError when trying to stop non-running backup", async () => {

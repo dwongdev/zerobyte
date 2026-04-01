@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, test } from "bun:test";
 import { HttpResponse, http, server } from "~/test/msw/server";
-import { cleanup, render, screen, userEvent, waitFor, within } from "~/test/test-utils";
+import { cleanup, fireEvent, render, screen, userEvent, waitFor, within } from "~/test/test-utils";
 
 type SnapshotFilesRequest = {
 	shortId: string;
@@ -82,7 +82,7 @@ describe("SnapshotTreeBrowser", () => {
 		expect(await screen.findByRole("button", { name: "project" })).toBeTruthy();
 	});
 
-	test("renders a single file when no display base path is available", async () => {
+	test("renders synthesized ancestor folders for a single file when no display base path is available", async () => {
 		const requests = mockListSnapshotFiles({
 			files: [{ name: "report.txt", path: "/mnt/project/report.txt", type: "file" }],
 		});
@@ -92,7 +92,14 @@ describe("SnapshotTreeBrowser", () => {
 			displayBasePath: undefined,
 		});
 
-		expect(await screen.findByRole("button", { name: "report.txt" })).toBeTruthy();
+		const mntRow = await screen.findByRole("button", { name: "mnt" });
+		const mntExpandIcon = mntRow.querySelector("svg");
+		if (!mntExpandIcon) {
+			throw new Error("Expected expand icon for mnt row");
+		}
+		fireEvent.click(mntExpandIcon);
+
+		expect(await screen.findByRole("button", { name: "project" })).toBeTruthy();
 		expect(requests[0]).toEqual({
 			shortId: "repo-1",
 			snapshotId: "snap-1",
@@ -252,7 +259,7 @@ describe("SnapshotTreeBrowser", () => {
 		}
 
 		const initialRequestCount = requests.length;
-		await userEvent.click(expandIcon);
+		fireEvent.click(expandIcon);
 
 		await waitFor(() => {
 			expect(requests.length).toBeGreaterThan(initialRequestCount);
