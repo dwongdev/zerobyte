@@ -67,8 +67,8 @@ function formatConfiguredDate(date: Date, options: DateFormatOptions, includeYea
 	const dateFormat = options.dateFormat ?? DEFAULT_DATE_FORMAT;
 	const safeDateFormat = DATE_FORMATS.includes(dateFormat) ? dateFormat : DEFAULT_DATE_FORMAT;
 	const parts = getDateTimeFormat(options.locale, options.timeZone, {
-		month: "numeric",
-		day: "numeric",
+		month: "2-digit",
+		day: "2-digit",
 		year: "numeric",
 	}).formatToParts(date);
 	const values = {
@@ -148,7 +148,7 @@ export function inferDateTimePreferences(locale?: string) {
 	};
 }
 
-// 1/10/2026, 2:30 PM
+// 01/10/2026, 2:30 PM
 function formatDateTime(date: DateInput, options: DateFormatOptions = {}): string {
 	return formatValidDate(
 		date,
@@ -161,7 +161,7 @@ function formatDateWithMonth(date: DateInput, options: DateFormatOptions = {}): 
 	return formatValidDate(date, (validDate) => formatConfiguredDateWithMonth(validDate, options));
 }
 
-// 1/10/2026
+// 01/10/2026
 function formatDate(date: DateInput, options: DateFormatOptions = {}): string {
 	return formatValidDate(date, (validDate) => formatConfiguredDate(validDate, options, true));
 }
@@ -171,7 +171,7 @@ function formatShortDate(date: DateInput, options: DateFormatOptions = {}): stri
 	return formatValidDate(date, (validDate) => formatConfiguredDate(validDate, options, false));
 }
 
-// 1/10, 2:30 PM
+// 01/10, 2:30 PM
 function formatShortDateTime(date: DateInput, options: DateFormatOptions = {}): string {
 	return formatValidDate(
 		date,

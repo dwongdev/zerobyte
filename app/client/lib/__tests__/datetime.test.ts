@@ -64,13 +64,13 @@ describe("datetime formatters", () => {
 	});
 
 	test("formats calendar values with an explicit locale and timezone", () => {
-		expect(formatShortDateTime(sampleDate, { locale: "en-US", timeZone: "UTC" })).toBe("1/10, 2:30 PM");
+		expect(formatShortDateTime(sampleDate, { locale: "en-US", timeZone: "UTC" })).toBe("01/10, 2:30 PM");
 	});
 
 	test.each([
-		["MM/DD/YYYY", "1/10/2026"],
-		["DD/MM/YYYY", "10/1/2026"],
-		["YYYY/MM/DD", "2026/1/10"],
+		["MM/DD/YYYY", "01/10/2026"],
+		["DD/MM/YYYY", "10/01/2026"],
+		["YYYY/MM/DD", "2026/01/10"],
 	] as const)("formats numeric dates with %s order", (dateFormat, expected) => {
 		expect(formatDate(sampleDate, { locale: "en-US", timeZone: "UTC", dateFormat })).toBe(expected);
 	});
@@ -106,6 +106,6 @@ describe("datetime formatters", () => {
 				dateFormat: "DD/MM/YYYY",
 				timeFormat: "24h",
 			}),
-		).toBe("10/1/2026, 14:30");
+		).toBe("10/01/2026, 14:30");
 	});
 });
