@@ -232,9 +232,10 @@ describe("RepositoryMutex", () => {
 		releaseS3();
 	});
 
-	test("should acquire many locks in repository order", async () => {
+	test("should wait to acquire all many-lock requests before locking any repository", async () => {
 		const releaseSharedB = await repoMutex.acquireShared("repo-b", "holder-b");
-		const results: string[] = [];
+		let manyAcquired = false;
+		let exclusiveAAcquired = false;
 
 		const manyPromise = repoMutex
 			.acquireMany([
@@ -242,34 +243,34 @@ describe("RepositoryMutex", () => {
 				{ repositoryId: "repo-a", type: "shared", operation: "many-a" },
 			])
 			.then((release) => {
-				results.push("many");
+				manyAcquired = true;
 				return release;
 			});
 
 		await new Promise((resolve) => setTimeout(resolve, 10));
 
 		const exclusiveAPromise = repoMutex.acquireExclusive("repo-a", "exclusive-a").then((release) => {
-			results.push("exclusive-a");
+			exclusiveAAcquired = true;
 			return release;
 		});
 
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		expect(results).toEqual([]);
+		expect(exclusiveAAcquired).toBe(true);
+		expect(manyAcquired).toBe(false);
 
 		releaseSharedB();
-
-		const releaseMany = await manyPromise;
-		expect(results).toEqual(["many"]);
-
-		releaseMany();
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		expect(manyAcquired).toBe(false);
 
 		const releaseExclusiveA = await exclusiveAPromise;
-		expect(results).toEqual(["many", "exclusive-a"]);
-
 		releaseExclusiveA();
+
+		const releaseMany = await manyPromise;
+		expect(manyAcquired).toBe(true);
+		releaseMany();
 	});
 
-	test("should release earlier locks when acquireMany is aborted", async () => {
+	test("should abort acquireMany without leaving partial locks behind", async () => {
 		const releaseExclusiveB = await repoMutex.acquireExclusive("repo-b", "holder-b");
 		const controller = new AbortController();
 
@@ -290,7 +291,7 @@ describe("RepositoryMutex", () => {
 		});
 
 		await new Promise((resolve) => setTimeout(resolve, 10));
-		expect(exclusiveAAcquired).toBe(false);
+		expect(exclusiveAAcquired).toBe(true);
 
 		controller.abort(new Error("stop"));
 		await expect(manyPromise).rejects.toThrow("stop");
@@ -300,6 +301,30 @@ describe("RepositoryMutex", () => {
 
 		releaseExclusiveA();
 		releaseExclusiveB();
+	});
+
+	test("should abort acquireMany if the signal aborts after waiting resolves", async () => {
+		const repoA = "many-abort-after-wake-a";
+		const repoB = "many-abort-after-wake-b";
+		const releaseExclusiveB = await repoMutex.acquireExclusive(repoB, "holder-b");
+		const controller = new AbortController();
+
+		const manyPromise = repoMutex.acquireMany(
+			[
+				{ repositoryId: repoB, type: "exclusive", operation: "many-b" },
+				{ repositoryId: repoA, type: "shared", operation: "many-a" },
+			],
+			controller.signal,
+		);
+
+		await new Promise((resolve) => setTimeout(resolve, 10));
+
+		releaseExclusiveB();
+		controller.abort(new Error("stop after wake"));
+
+		await expect(manyPromise).rejects.toThrow("stop after wake");
+		expect(repoMutex.isLocked(repoA)).toBe(false);
+		expect(repoMutex.isLocked(repoB)).toBe(false);
 	});
 
 	test("should safely handle multiple calls to the release function", async () => {

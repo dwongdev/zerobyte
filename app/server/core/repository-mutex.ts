@@ -26,6 +26,7 @@ interface RepositoryLockState {
 
 class RepositoryMutex {
 	private locks = new Map<string, RepositoryLockState>();
+	private changeListeners = new Map<string, Set<() => void>>();
 	private lockIdCounter = 0;
 
 	private getOrCreateState(repositoryId: string): RepositoryLockState {
@@ -50,6 +51,129 @@ class RepositoryMutex {
 		if (state && state.sharedHolders.size === 0 && !state.exclusiveHolder && state.waitQueue.length === 0) {
 			this.locks.delete(repositoryId);
 		}
+	}
+
+	private notifyChange(repositoryId: string): void {
+		const listeners = this.changeListeners.get(repositoryId);
+		if (!listeners) {
+			return;
+		}
+
+		for (const listener of listeners) {
+			listener();
+		}
+	}
+
+	private canAcquireImmediately(state: RepositoryLockState | undefined, type: LockType): boolean {
+		if (!state) {
+			return true;
+		}
+
+		if (type === "shared") {
+			const hasExclusiveInQueue = state.waitQueue.some((item) => item.type === "exclusive");
+			return !state.exclusiveHolder && !hasExclusiveInQueue;
+		}
+
+		return !state.exclusiveHolder && state.sharedHolders.size === 0 && state.waitQueue.length === 0;
+	}
+
+	private waitForChange(repositoryIds: string[], signal?: AbortSignal) {
+		if (signal?.aborted) {
+			throw signal.reason || new Error("Operation aborted");
+		}
+
+		return new Promise<void>((resolve, reject) => {
+			const uniqueRepositoryIds = [...new Set(repositoryIds)];
+			const cleanupCallbacks: Array<() => void> = [];
+			let settled = false;
+
+			const settle = (callback: () => void) => {
+				if (settled) {
+					return;
+				}
+
+				settled = true;
+				for (const cleanup of cleanupCallbacks) {
+					cleanup();
+				}
+				callback();
+			};
+
+			for (const repositoryId of uniqueRepositoryIds) {
+				let listeners = this.changeListeners.get(repositoryId);
+				if (!listeners) {
+					listeners = new Set();
+					this.changeListeners.set(repositoryId, listeners);
+				}
+
+				const listener = () => settle(resolve);
+				listeners.add(listener);
+
+				cleanupCallbacks.push(() => {
+					const currentListeners = this.changeListeners.get(repositoryId);
+					if (!currentListeners) {
+						return;
+					}
+
+					currentListeners.delete(listener);
+					if (currentListeners.size === 0) {
+						this.changeListeners.delete(repositoryId);
+					}
+				});
+			}
+
+			if (signal) {
+				const onAbort = () => {
+					settle(() => reject(signal.reason || new Error("Operation aborted")));
+				};
+
+				signal.addEventListener("abort", onAbort);
+				cleanupCallbacks.push(() => {
+					signal.removeEventListener("abort", onAbort);
+				});
+			}
+		});
+	}
+
+	private tryAcquireMany(requests: LockRequest[]) {
+		for (const request of requests) {
+			if (!this.canAcquireImmediately(this.locks.get(request.repositoryId), request.type)) {
+				return null;
+			}
+		}
+
+		const releases = requests.map((request) => {
+			const state = this.getOrCreateState(request.repositoryId);
+			const lockId = this.generateLockId();
+
+			if (request.type === "shared") {
+				state.sharedHolders.set(lockId, {
+					id: lockId,
+					operation: request.operation,
+					acquiredAt: Date.now(),
+				});
+			} else {
+				state.exclusiveHolder = {
+					id: lockId,
+					operation: request.operation,
+					acquiredAt: Date.now(),
+				};
+			}
+
+			return this.createRelease(request.type, request.repositoryId, lockId);
+		});
+
+		let released = false;
+		return () => {
+			if (released) {
+				return;
+			}
+
+			released = true;
+			for (const release of releases.toReversed()) {
+				release();
+			}
+		};
 	}
 
 	async acquireShared(repositoryId: string, operation: string, signal?: AbortSignal): Promise<() => void> {
@@ -88,6 +212,7 @@ class RepositoryMutex {
 						if (index !== -1) {
 							state.waitQueue.splice(index, 1);
 							this.cleanupStateIfEmpty(repositoryId);
+							this.notifyChange(repositoryId);
 							reject(signal.reason || new Error("Operation aborted"));
 						}
 					};
@@ -142,6 +267,7 @@ class RepositoryMutex {
 						if (index !== -1) {
 							state.waitQueue.splice(index, 1);
 							this.cleanupStateIfEmpty(repositoryId);
+							this.notifyChange(repositoryId);
 							reject(signal.reason || new Error("Operation aborted"));
 						}
 					};
@@ -182,34 +308,21 @@ class RepositoryMutex {
 		}
 
 		const sortedRequests = [...requests].sort((a, b) => a.repositoryId.localeCompare(b.repositoryId));
-		const releases: Array<() => void> = [];
+		while (true) {
+			const releaseLocks = this.tryAcquireMany(sortedRequests);
+			if (releaseLocks) {
+				return releaseLocks;
+			}
 
-		try {
-			for (const request of sortedRequests) {
-				const release =
-					request.type === "shared"
-						? await this.acquireShared(request.repositoryId, request.operation, signal)
-						: await this.acquireExclusive(request.repositoryId, request.operation, signal);
-				releases.push(release);
+			await this.waitForChange(
+				sortedRequests.map((request) => request.repositoryId),
+				signal,
+			);
+
+			if (signal?.aborted) {
+				throw signal.reason || new Error("Operation aborted");
 			}
-		} catch (error) {
-			for (const release of releases.toReversed()) {
-				release();
-			}
-			throw error;
 		}
-
-		let released = false;
-		return () => {
-			if (released) {
-				return;
-			}
-
-			released = true;
-			for (const release of releases.toReversed()) {
-				release();
-			}
-		};
 	}
 
 	private releaseShared(repositoryId: string, lockId: string): void {
@@ -229,6 +342,7 @@ class RepositoryMutex {
 
 		this.processWaitQueue(repositoryId);
 		this.cleanupStateIfEmpty(repositoryId);
+		this.notifyChange(repositoryId);
 	}
 
 	private releaseExclusive(repositoryId: string, lockId: string): void {
@@ -249,6 +363,7 @@ class RepositoryMutex {
 
 		this.processWaitQueue(repositoryId);
 		this.cleanupStateIfEmpty(repositoryId);
+		this.notifyChange(repositoryId);
 	}
 
 	private processWaitQueue(repositoryId: string): void {
