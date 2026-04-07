@@ -24,6 +24,7 @@ export const AdvancedSection = ({ form }: AdvancedSectionProps) => {
 								min={0}
 								max={32}
 								value={field.value ?? ""}
+								placeholder="e.g., 3"
 								onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
 							/>
 						</FormControl>
@@ -45,6 +46,7 @@ export const AdvancedSection = ({ form }: AdvancedSectionProps) => {
 								min={0}
 								max={1440}
 								step={1}
+								placeholder="e.g., 60"
 								value={field.value ?? ""}
 								onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
 							/>
