@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import { devtools } from "@tanstack/devtools-vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
@@ -17,12 +16,14 @@ const config = defineConfig({
 	plugins: [
 		mdx(MdxConfig),
 		devtools(),
-		tsconfigPaths({ projects: ["./tsconfig.json"] }),
 		tailwindcss(),
 		cloudflare({ viteEnvironment: { name: "ssr" } }),
 		tanstackStart(),
 		viteReact(),
 	],
+	resolve: {
+		tsconfigPaths: true,
+	},
 });
 
 export default config;

@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { createConsola, type ConsolaReporter } from "consola";
 import { formatWithOptions } from "node:util";
-import { sanitizeSensitiveData } from "./sanitize";
+import { sanitizeSensitiveData } from "../utils/sanitize";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 

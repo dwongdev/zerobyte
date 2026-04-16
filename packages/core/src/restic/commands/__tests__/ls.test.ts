@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import * as cleanupModule from "../../helpers/cleanup-temporary-keys";
-import * as spawnModule from "../../../utils/spawn";
+import * as spawnModule from "../../../node/spawn";
 import { ls } from "../ls";
 import type { ResticDeps } from "../../types";
-import type { SafeSpawnParams } from "../../../utils/spawn";
+import type { SafeSpawnParams } from "../../../node/spawn";
 
 const mockDeps: ResticDeps = {
 	resolveSecret: async (s) => s,
