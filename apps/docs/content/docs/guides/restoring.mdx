@@ -1,0 +1,263 @@
+---
+title: Restoring Data
+description: Restore files and folders from snapshots, choose the right destination, and avoid common restore pitfalls
+---
+
+Zerobyte lets you recover data in two ways:
+
+- **Restore**, writes files back to a filesystem path
+- **Download**, retrieves the selected contents without restoring them directly into a mounted destination
+
+This guide covers when to use each option, how the restore form works, and what to do when a destination rejects ownership or permission changes.
+
+## Before you restore
+
+Before starting a restore, check these basics:
+
+- the repository is reachable and unlocked
+- the target path is writable
+- the destination has enough free space
+
+If you are restoring into a path that is bind-mounted into the container, make sure it is **not** mounted read-only. Read-only mounts can be backed up, but they cannot accept restores back into the original location.
+
+<Callout type="warn">
+If you are not fully sure about the target, restore to a custom staging path first. It is safer, easier to verify, and reduces the chance of overwriting live data.
+</Callout>
+
+## Restore vs Download
+
+Use **Restore** when you want Zerobyte to write files back onto a filesystem path.
+
+Use **Download** when you want to recover the contents without restoring them directly into the current mounted destination.
+
+As a rule of thumb:
+
+- use **Restore** for normal recovery back to a server path
+- use **Download** for one-off recovery to your workstation, or when a mounted destination keeps failing on permissions or metadata
+
+In the current UI, **Download** is available when you select a single item, or when you leave the selection empty and download the snapshot contents directly.
+
+## Standard restore workflow
+
+<Steps>
+<Step>
+
+### Open the backup job
+
+Go to **Backups** and open the job that contains the data you need.
+
+</Step>
+
+<Step>
+
+### Choose the snapshot
+
+Select the snapshot from the time period you want to recover.
+
+</Step>
+
+<Step>
+
+### Browse and select data
+
+Use the file browser to inspect the snapshot and optionally select specific files or folders.
+
+If you leave the selection empty, Zerobyte restores the full snapshot scope that is currently being viewed.
+
+</Step>
+
+<Step>
+
+### Choose the destination
+
+Pick either:
+
+- **Original location**, to put the data back where it came from
+- **Custom location**, to restore into another path
+
+</Step>
+
+<Step>
+
+### Review overwrite behavior
+
+Choose how Zerobyte should handle files that already exist at the target.
+
+</Step>
+
+<Step>
+
+### Start the restore
+
+Click **Restore** and wait for the progress indicator to finish. When it completes, verify that the recovered files are present and usable.
+
+</Step>
+</Steps>
+
+## Choosing the restore location
+
+### Original location
+
+Original-location restore is convenient when you want to put the snapshot back exactly where it came from.
+
+Use it when:
+
+- the original path still exists
+- the path is writable
+- you are intentionally restoring back in place
+
+Be careful with it because it targets live paths.
+
+### Custom location
+
+Custom-location restore writes the recovered data to another path that you choose.
+
+This is the safer default when:
+
+- you want to inspect the recovered files first
+- you are restoring onto a different server or container
+- the original location is no longer correct
+- you expect permission or metadata problems on the final destination
+
+<Callout type="info">
+If the snapshot was created from non-POSIX paths, or from source paths that do not match the current Zerobyte server or linked volume, original-location restore is unavailable. Restore to a custom location instead.
+</Callout>
+
+## Overwrite modes
+
+Zerobyte exposes Restic's overwrite behavior in the restore form.
+
+### Always overwrite
+
+Replace existing files with the snapshot version. This is the most direct in-place restore mode.
+
+### Only if content changed
+
+Overwrite existing files only when their content differs from the snapshot. This avoids replacing identical files unnecessarily.
+
+### Only if snapshot is newer
+
+Overwrite existing files only when the snapshot version has a newer modification time.
+
+### Never overwrite
+
+Restore only missing files. Existing files are left in place.
+
+## Advanced option: excluding extended attributes
+
+The restore form includes an **Exclude extended attributes** field under **Advanced options**.
+
+Use it only when the destination accepts file contents but rejects specific xattrs. Common examples include:
+
+- `security.*`
+- `system.*`
+- ACL-related attributes
+
+This is useful for narrowly targeted compatibility problems. It does **not** fix ownership or mode failures like `lchown` or `chmod`.
+
+## Why some restores fail on permissions or ownership
+
+If you see errors like these:
+
+```text
+lchown /path/to/file: operation not permitted
+lchown /path/to/file: permission denied
+chmod /path/to/file: operation not permitted
+failed to restore timestamp
+```
+
+the data copy often succeeded. The failure usually happens afterward, when Restic tries to re-apply the original metadata from the snapshot.
+
+Restic restores more than file contents. It also restores metadata such as:
+
+- owner and group
+- file mode
+- timestamps
+- extended attributes and ACL-related metadata
+
+That works well on a normal local Linux filesystem. It gets more complicated when the target is a mounted or translated filesystem such as:
+
+- SFTP volumes mounted through SSHFS
+- SMB or CIFS shares
+- WebDAV volumes
+- rclone-mounted cloud storage
+- Windows systems accessed through SFTP
+- NAS or appliance-managed shares that do not allow arbitrary ownership changes
+
+These destinations may let Zerobyte write file contents while still rejecting `chown`, `chmod`, timestamp, or xattr updates.
+
+<Callout type="info">
+In Zerobyte today, SFTP, SMB, and WebDAV mounts pass the container process `uid` and `gid` to the mount command. If the container runs as root, those mounts can appear as `0:0` inside the container even when the remote system stores ownership differently. A backup taken from that mounted view can therefore record synthetic ownership in the snapshot.
+</Callout>
+
+## What Zerobyte can and cannot change
+
+Zerobyte can:
+
+- restore to another target path
+- restore selected files or folders
+- let you download data instead of restoring it directly
+- exclude specific extended attributes during restore
+
+Zerobyte cannot currently tell Restic to restore file contents while completely skipping owner, group, mode, and timestamp restoration. Restic supports xattr filtering, but it does not provide a general "ignore metadata" restore mode.
+
+That means a restore directly into a metadata-rejecting mount cannot be made fully reliable without using a different destination or a second manual copy step.
+
+## Reliable workarounds
+
+### Restore to a different place first
+
+This is the most reliable workaround.
+
+Restore to a local Linux path or another writable POSIX filesystem first, verify the recovered files, then move or copy them to the final destination manually.
+
+This works because:
+
+- Restic finishes on a filesystem that accepts metadata updates
+- the later copy step only has to match what the final destination actually supports
+
+### Use Download for small recoveries
+
+If you only need one file or one folder quickly, use **Download** instead of **Restore**.
+
+This avoids asking the mounted destination to accept snapshot ownership and permission metadata.
+
+### Exclude failing xattrs when that is the only problem
+
+If the failure is limited to extended attributes, exclude the failing xattr under **Advanced options** and retry.
+
+Do not expect this to solve `lchown` or `chmod` failures.
+
+### Prefer host mounts or native paths
+
+If you control the Docker host, a more reliable pattern is:
+
+1. mount the remote share on the host
+2. bind-mount that host path into the Zerobyte container
+3. restore to that bind-mounted path or to another local staging path first
+
+This often behaves better than restoring straight through a FUSE-based mount created inside the container.
+
+### Use a filesystem that supports POSIX metadata when exact restore fidelity matters
+
+If you need the restored data to keep Unix owner, group, and mode information exactly, restore to a destination that supports those semantics end-to-end.
+
+That is usually a local Linux filesystem or a properly configured NFS share, not a translated or appliance-managed mount.
+
+## Practical recommendations
+
+- Test restores regularly, not just backups
+- Prefer a custom restore path for routine verification
+- Keep at least one fast local repository for quick recovery
+- Use **Download** for ad-hoc recovery to your own machine
+- Verify recovered files before deleting or overwriting the originals
+
+## Related guides
+
+- [Quick Start](/docs/quickstart)
+- [3-2-1 Backup Strategy](/docs/guides/3-2-1-backup-strategy)
+- [Recovery keys and repository passwords](/docs/guides/recovery-key-and-repository-passwords)
+- [Troubleshooting](/docs/troubleshooting)
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Step, Steps } from "fumadocs-ui/components/steps";

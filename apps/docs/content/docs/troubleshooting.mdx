@@ -223,6 +223,12 @@ Rclone volumes (mounting cloud storage as a data source) require:
 
 ## Backup Issues
 
+### Restore Fails with `lchown` or `operation not permitted`
+
+If you restore directly to SFTP, SMB, WebDAV, rclone, or another mounted filesystem, the destination may accept file contents but reject ownership, mode, timestamp, or xattr updates.
+
+See [Restoring Data](/docs/guides/restoring) for the full restore workflow, the explanation, and the safest workarounds.
+
 ### Backup Failed: Permission Denied
 
 Ensure the volume directory has proper permissions:
