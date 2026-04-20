@@ -19,27 +19,25 @@ export type VolumeBackend = {
 	checkHealth: () => Promise<OperationResult>;
 };
 
-export const createVolumeBackend = (volume: Volume): VolumeBackend => {
-	const path = getVolumePath(volume);
-
+export const createVolumeBackend = (volume: Volume, mountPath = getVolumePath(volume)): VolumeBackend => {
 	switch (volume.config.backend) {
 		case "nfs": {
-			return makeNfsBackend(volume.config, path);
+			return makeNfsBackend(volume.config, mountPath);
 		}
 		case "smb": {
-			return makeSmbBackend(volume.config, path);
+			return makeSmbBackend(volume.config, mountPath);
 		}
 		case "directory": {
-			return makeDirectoryBackend(volume.config, path);
+			return makeDirectoryBackend(volume.config, mountPath);
 		}
 		case "webdav": {
-			return makeWebdavBackend(volume.config, path);
+			return makeWebdavBackend(volume.config, mountPath);
 		}
 		case "rclone": {
-			return makeRcloneBackend(volume.config, path);
+			return makeRcloneBackend(volume.config, mountPath);
 		}
 		case "sftp": {
-			return makeSftpBackend(volume.config, path);
+			return makeSftpBackend(volume.config, mountPath);
 		}
 		default: {
 			throw new Error("Unsupported backend");

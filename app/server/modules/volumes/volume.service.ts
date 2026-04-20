@@ -237,7 +237,6 @@ const testConnection = async (backendConfig: BackendConfig) => {
 		id: 0,
 		shortId: asShortId("test"),
 		name: "test-connection",
-		path: tempDir,
 		config: encryptedConfig,
 		createdAt: Date.now(),
 		updatedAt: Date.now(),
@@ -250,7 +249,7 @@ const testConnection = async (backendConfig: BackendConfig) => {
 		organizationId: "test-org",
 	};
 
-	const backend = createVolumeBackend(mockVolume);
+	const backend = createVolumeBackend(mockVolume, tempDir);
 	const { error } = await backend.mount();
 
 	await backend.unmount();

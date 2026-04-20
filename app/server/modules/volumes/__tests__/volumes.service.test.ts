@@ -211,3 +211,31 @@ describe("volumeService.ensureHealthyVolume", () => {
 		});
 	});
 });
+
+describe("volumeService.testConnection", () => {
+	test("uses an isolated temp mount path for backend test connections", async () => {
+		const mount = vi.fn().mockResolvedValue({ status: "mounted" });
+		const unmount = vi.fn().mockResolvedValue({ status: "unmounted" });
+		const createVolumeBackendSpy = vi.spyOn(backendModule, "createVolumeBackend").mockReturnValue({
+			mount,
+			unmount,
+			checkHealth: vi.fn(),
+		});
+
+		await volumeService.testConnection({
+			backend: "nfs",
+			server: "127.0.0.1",
+			exportPath: "/exports/test",
+			version: "4",
+			port: 2049,
+			readOnly: false,
+		});
+
+		expect(createVolumeBackendSpy).toHaveBeenCalledOnce();
+		const [, mountPath] = createVolumeBackendSpy.mock.calls[0];
+		expect(mountPath).toEqual(expect.stringContaining(`${path.sep}zerobyte-test-`));
+		await expect(fs.access(mountPath as string)).rejects.toThrow();
+		expect(mount).toHaveBeenCalledOnce();
+		expect(unmount).toHaveBeenCalledOnce();
+	});
+});
