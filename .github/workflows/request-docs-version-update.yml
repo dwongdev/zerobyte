@@ -1,0 +1,96 @@
+name: Request docs version update
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to update documentation examples to
+        required: true
+        type: string
+      base_branch:
+        description: Branch Copilot should branch from
+        required: false
+        default: main
+        type: string
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      base_branch:
+        required: false
+        default: main
+        type: string
+    secrets:
+      COPILOT_ASSIGNMENT_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  request-docs-version-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Copilot issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.COPILOT_ASSIGNMENT_TOKEN }}
+          script: |
+            if (!process.env.COPILOT_ASSIGNMENT_TOKEN) {
+              core.setFailed("COPILOT_ASSIGNMENT_TOKEN is required to assign issues to GitHub Copilot.");
+              return;
+            }
+
+            const releaseTag = process.env.RELEASE_TAG;
+            const baseBranch = process.env.BASE_BRANCH;
+            const { owner, repo } = context.repo;
+            const targetRepo = `${owner}/${repo}`;
+            const releaseUrl = `https://github.com/${targetRepo}/releases/tag/${releaseTag}`;
+            const title = `Update Docker Compose examples to ${releaseTag}`;
+            const body = [
+              `A new Zerobyte release was published: ${releaseTag}`,
+              "",
+              `Release: ${releaseUrl}`,
+              "",
+              "Please create a pull request that updates Docker Compose documentation examples to use:",
+              "",
+              "```yaml",
+              `image: ghcr.io/nicotsx/zerobyte:${releaseTag}`,
+              "```",
+              "",
+              "Scope:",
+              "",
+              "- Update Docker image tags in `README.md`.",
+              "- Update Docker image tags in `apps/docs/`.",
+              "- Only update Zerobyte image versions in Docker Compose examples.",
+              "- Do not change unrelated prose, formatting, or code.",
+              "",
+              "Verification:",
+              "",
+              "- Search for stale `ghcr.io/nicotsx/zerobyte:v...` references in `README.md` and `apps/docs/`.",
+              "- Run any formatting or documentation checks that are appropriate for the touched files.",
+            ].join("\n");
+
+            await github.request("POST /repos/{owner}/{repo}/issues", {
+              owner,
+              repo,
+              title,
+              body,
+              assignees: ["copilot-swe-agent[bot]"],
+              agent_assignment: {
+                target_repo: targetRepo,
+                base_branch: baseBranch,
+                custom_instructions: "Create a focused documentation-only PR for the release version update.",
+                custom_agent: "",
+                model: "",
+              },
+              headers: {
+                accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+              },
+            });
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          BASE_BRANCH: ${{ inputs.base_branch }}
+          COPILOT_ASSIGNMENT_TOKEN: ${{ secrets.COPILOT_ASSIGNMENT_TOKEN }}

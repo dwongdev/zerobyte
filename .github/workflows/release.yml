@@ -147,3 +147,13 @@ jobs:
           draft: false
           prerelease: true
           files: cli/runtipi-cli-*
+
+  request-docs-version-update:
+    uses: ./.github/workflows/request-docs-version-update.yml
+    needs: [publish-release, determine-release-type]
+    if: needs.determine-release-type.outputs.release_type == 'release'
+    with:
+      release_tag: ${{ needs.determine-release-type.outputs.tagname }}
+      base_branch: ${{ github.event.repository.default_branch }}
+    secrets:
+      COPILOT_ASSIGNMENT_TOKEN: ${{ secrets.COPILOT_ASSIGNMENT_TOKEN }}
