@@ -276,6 +276,41 @@ describe("backup execution - validation failures", () => {
 		).toBe(false);
 	});
 
+	test("passes configured backup webhooks to the backup agent", async () => {
+		const { runBackupMock } = setup();
+		const volume = await createTestVolume();
+		const repository = await createTestRepository();
+		const backupWebhooks = {
+			pre: {
+				url: "http://localhost:8080/stop",
+				headers: ["authorization: Bearer stop-token"],
+				body: '{"action":"stop"}',
+			},
+			post: {
+				url: "http://localhost:8080/start",
+				headers: ["authorization: Bearer start-token"],
+				body: '{"action":"start"}',
+			},
+		};
+
+		const schedule = await createTestBackupSchedule({
+			volumeId: volume.id,
+			repositoryId: repository.id,
+			backupWebhooks,
+		});
+
+		await backupsService.executeBackup(schedule.id);
+
+		expect(runBackupMock).toHaveBeenCalledWith(
+			"local",
+			expect.objectContaining({
+				payload: expect.objectContaining({
+					webhooks: backupWebhooks,
+				}),
+			}),
+		);
+	});
+
 	test("should fail backup when the local agent is unavailable", async () => {
 		const { runBackupMock } = setup();
 		const volume = await createTestVolume();

@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { runBackupLifecycle } from "@zerobyte/core/backup-hooks";
 import type { BackupSchedule, Volume, Repository } from "../../db/schema";
 import { config } from "../../core/config";
 import { restic, resticDeps } from "../../core/restic";
@@ -54,6 +55,7 @@ const createBackupRunPayload = async ({
 			rcloneConfigFile: resticDeps.rcloneConfigFile,
 			hostname: resticDeps.hostname,
 		},
+		webhooks: schedule.backupWebhooks ?? { pre: null, post: null },
 	};
 };
 
@@ -61,41 +63,21 @@ const executeBackupWithoutAgent = async (
 	payload: BackupRunPayload,
 	{ signal, onProgress }: Pick<BackupExecutionRequest, "signal" | "onProgress">,
 ) => {
-	try {
-		const execution = await Effect.runPromise(
-			restic
-				.backup(payload.repositoryConfig, payload.sourcePath, {
-					...payload.options,
-					organizationId: payload.organizationId,
-					signal,
-					onProgress,
-				})
-				.pipe(
-					Effect.map((result) => ({ success: true as const, result })),
-					Effect.catchAll((error) => Effect.succeed({ success: false as const, error })),
-				),
-		);
-
-		if (!execution.success) {
-			return {
-				status: "failed" as const,
-				error: toErrorDetails(execution.error),
-			};
-		}
-
-		const { exitCode, result, warningDetails } = execution.result;
-		return {
-			status: "completed" as const,
-			exitCode,
-			result,
-			warningDetails,
-		};
-	} catch (error) {
-		return {
-			status: "failed" as const,
-			error: toErrorDetails(error),
-		};
-	}
+	return Effect.runPromise(
+		runBackupLifecycle({
+			restic,
+			repositoryConfig: payload.repositoryConfig,
+			sourcePath: payload.sourcePath,
+			jobId: payload.jobId,
+			scheduleId: payload.scheduleId,
+			organizationId: payload.organizationId,
+			options: payload.options,
+			webhooks: payload.webhooks,
+			signal,
+			onProgress,
+			formatError: toErrorDetails,
+		}),
+	);
 };
 
 export const backupExecutor = {

@@ -104,6 +104,7 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 			includePatterns: data.includePatterns ?? [],
 			oneFileSystem: data.oneFileSystem,
 			customResticParams: data.customResticParams ?? [],
+			backupWebhooks: data.backupWebhooks ?? null,
 			nextBackupAt: nextBackupAt,
 			shortId: generateShortId(),
 			maxRetries: data.maxRetries,
@@ -163,7 +164,13 @@ const updateSchedule = async (scheduleIdOrShortId: number | string, data: Update
 
 	const [updated] = await db
 		.update(backupSchedulesTable)
-		.set({ ...data, repositoryId: repository.id, nextBackupAt, updatedAt: Date.now() })
+		.set({
+			...data,
+			repositoryId: repository.id,
+			backupWebhooks: data.backupWebhooks === undefined ? schedule.backupWebhooks : data.backupWebhooks,
+			nextBackupAt,
+			updatedAt: Date.now(),
+		})
 		.where(and(eq(backupSchedulesTable.id, schedule.id), eq(backupSchedulesTable.organizationId, organizationId)))
 		.returning();
 

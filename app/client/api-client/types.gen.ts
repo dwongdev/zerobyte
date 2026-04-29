@@ -2434,6 +2434,18 @@ export type ListBackupSchedulesResponses = {
         includePatterns: Array<string> | null;
         oneFileSystem: boolean;
         customResticParams: Array<string> | null;
+        backupWebhooks: {
+            pre: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+            post: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+        } | null;
         maxRetries: number;
         retryDelay: number;
         lastBackupAt: number | null;
@@ -2712,6 +2724,18 @@ export type CreateBackupScheduleData = {
         oneFileSystem?: boolean;
         tags?: Array<string>;
         customResticParams?: Array<string>;
+        backupWebhooks?: {
+            pre: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+            post: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+        } | null;
         maxRetries?: number;
         retryDelay?: number;
     };
@@ -2747,6 +2771,18 @@ export type CreateBackupScheduleResponses = {
         includePatterns: Array<string> | null;
         oneFileSystem: boolean;
         customResticParams: Array<string> | null;
+        backupWebhooks: {
+            pre: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+            post: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+        } | null;
         maxRetries: number;
         retryDelay: number;
         lastBackupAt: number | null;
@@ -2816,6 +2852,18 @@ export type GetBackupScheduleResponses = {
         includePatterns: Array<string> | null;
         oneFileSystem: boolean;
         customResticParams: Array<string> | null;
+        backupWebhooks: {
+            pre: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+            post: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+        } | null;
         maxRetries: number;
         retryDelay: number;
         lastBackupAt: number | null;
@@ -3093,6 +3141,18 @@ export type UpdateBackupScheduleData = {
         oneFileSystem?: boolean;
         tags?: Array<string>;
         customResticParams?: Array<string>;
+        backupWebhooks?: {
+            pre: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+            post: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+        } | null;
         maxRetries?: number;
         retryDelay?: number;
     };
@@ -3130,6 +3190,18 @@ export type UpdateBackupScheduleResponses = {
         includePatterns: Array<string> | null;
         oneFileSystem: boolean;
         customResticParams: Array<string> | null;
+        backupWebhooks: {
+            pre: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+            post: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+        } | null;
         maxRetries: number;
         retryDelay: number;
         lastBackupAt: number | null;
@@ -3179,6 +3251,18 @@ export type GetBackupScheduleForVolumeResponses = {
         includePatterns: Array<string> | null;
         oneFileSystem: boolean;
         customResticParams: Array<string> | null;
+        backupWebhooks: {
+            pre: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+            post: {
+                url: string;
+                headers?: Array<string>;
+                body?: string;
+            } | null;
+        } | null;
         maxRetries: number;
         retryDelay: number;
         lastBackupAt: number | null;

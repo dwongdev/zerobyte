@@ -1,5 +1,7 @@
-import { afterEach, expect, test, vi } from "vitest";
 import { Effect } from "effect";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, expect, test, vi } from "vitest";
 import waitForExpect from "wait-for-expect";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { parseAgentMessage, type BackupCancelPayload, type BackupRunPayload } from "@zerobyte/contracts/agent-protocol";
@@ -7,6 +9,12 @@ import * as resticServer from "@zerobyte/core/restic/server";
 import { handleBackupCancelCommand } from "./backup-cancel";
 import { handleBackupRunCommand } from "./backup-run";
 import type { ControllerCommandContext, RunningJob } from "../context";
+
+const server = setupServer();
+
+beforeAll(() => {
+	server.listen({ onUnhandledRequest: "error" });
+});
 
 const createDeferred = <T>() => {
 	let resolve!: (value: T) => void;
@@ -19,6 +27,253 @@ const createDeferred = <T>() => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	server.resetHandlers();
+});
+
+afterAll(() => {
+	server.close();
+});
+
+const createRunPayload = (overrides: Partial<BackupRunPayload> = {}) =>
+	fromPartial<BackupRunPayload>({
+		jobId: "job-1",
+		scheduleId: "schedule-1",
+		organizationId: "org-1",
+		sourcePath: "/tmp/source",
+		repositoryConfig: {
+			backend: "local",
+			path: "/tmp/repository",
+		},
+		options: {},
+		runtime: {
+			password: "password",
+			cacheDir: "/tmp/restic-cache",
+			passFile: "/tmp/restic-pass",
+			defaultExcludes: [],
+			rcloneConfigFile: "/tmp/rclone.conf",
+		},
+		webhooks: { pre: null, post: null },
+		...overrides,
+	});
+
+const runBackupCommand = async (payload: BackupRunPayload) => {
+	const outboundMessages: string[] = [];
+	const runningJobs = new Map<string, RunningJob>();
+
+	const context: ControllerCommandContext = {
+		getRunningJob: (jobId) => Effect.succeed(runningJobs.get(jobId)),
+		setRunningJob: (jobId, job) =>
+			Effect.sync(() => {
+				runningJobs.set(jobId, job);
+			}),
+		deleteRunningJob: (jobId) =>
+			Effect.sync(() => {
+				runningJobs.delete(jobId);
+			}),
+		offerOutbound: (message) =>
+			Effect.sync(() => {
+				outboundMessages.push(message);
+				return true;
+			}),
+	};
+
+	await Effect.runPromise(
+		Effect.gen(function* () {
+			yield* handleBackupRunCommand(context, payload);
+			yield* Effect.promise(() =>
+				waitForExpect(() => {
+					expect(runningJobs.has(payload.jobId)).toBe(false);
+				}),
+			);
+		}),
+	);
+
+	return outboundMessages.map((message) => parseAgentMessage(message));
+};
+
+test("runs pre and post backup webhooks around restic", async () => {
+	const events: string[] = [];
+
+	server.use(
+		http.post("http://localhost:8080/pre", async ({ request }) => {
+			const body = (await request.json()) as { event: string };
+			events.push(body.event);
+			return new HttpResponse(null, { status: 204 });
+		}),
+		http.post("http://localhost:8080/post", async ({ request }) => {
+			const body = (await request.json()) as { event: string };
+			events.push(body.event);
+			return new HttpResponse(null, { status: 204 });
+		}),
+	);
+
+	vi.spyOn(resticServer, "createRestic").mockReturnValue(
+		fromPartial({
+			backup: () =>
+				Effect.sync(() => {
+					events.push("restic");
+					return { exitCode: 0, result: null, warningDetails: null };
+				}),
+		}),
+	);
+
+	const messages = await runBackupCommand(
+		createRunPayload({
+			webhooks: {
+				pre: { url: "http://localhost:8080/pre" },
+				post: { url: "http://localhost:8080/post" },
+			},
+		}),
+	);
+
+	expect(events).toEqual(["backup.pre", "restic", "backup.post"]);
+	expect(messages.some((message) => message?.success && message.data.type === "backup.completed")).toBe(true);
+});
+
+test("sends configured webhook headers and body without changing them", async () => {
+	const requests: Array<{ url: string; headers: Headers; body: string }> = [];
+
+	server.use(
+		http.post("http://localhost:8080/pre", async ({ request }) => {
+			requests.push({
+				url: request.url,
+				headers: request.headers,
+				body: await request.text(),
+			});
+			return new HttpResponse(null, { status: 204 });
+		}),
+		http.post("http://localhost:8080/post", async ({ request }) => {
+			requests.push({
+				url: request.url,
+				headers: request.headers,
+				body: await request.text(),
+			});
+			return new HttpResponse(null, { status: 204 });
+		}),
+	);
+
+	vi.spyOn(resticServer, "createRestic").mockReturnValue(
+		fromPartial({
+			backup: () => Effect.succeed({ exitCode: 0, result: null, warningDetails: null }),
+		}),
+	);
+
+	await runBackupCommand(
+		createRunPayload({
+			webhooks: {
+				pre: {
+					url: "http://localhost:8080/pre",
+					headers: ["authorization: Bearer pre-token", "content-type: application/json"],
+					body: '{"action":"stop"}',
+				},
+				post: {
+					url: "http://localhost:8080/post",
+					headers: ["authorization: Bearer post-token"],
+					body: "start-container",
+				},
+			},
+		}),
+	);
+
+	expect(requests).toHaveLength(2);
+	expect(requests[0]?.url).toBe("http://localhost:8080/pre");
+	expect(requests[0]?.headers.get("authorization")).toBe("Bearer pre-token");
+	expect(requests[0]?.headers.get("content-type")).toBe("application/json");
+	expect(requests[0]?.body).toBe('{"action":"stop"}');
+	expect(requests[1]?.url).toBe("http://localhost:8080/post");
+	expect(requests[1]?.headers.get("authorization")).toBe("Bearer post-token");
+	expect(requests[1]?.body).toBe("start-container");
+});
+
+test("fails without running restic when the pre-backup webhook fails", async () => {
+	const backupMock = vi.fn();
+	server.use(
+		http.post("http://localhost:8080/pre", () => {
+			return new HttpResponse("stop failed", { status: 500 });
+		}),
+	);
+	vi.spyOn(resticServer, "createRestic").mockReturnValue(
+		fromPartial({
+			backup: backupMock,
+		}),
+	);
+
+	const messages = await runBackupCommand(
+		createRunPayload({
+			webhooks: {
+				pre: { url: "http://localhost:8080/pre" },
+				post: null,
+			},
+		}),
+	);
+
+	const failed = messages.find((message) => message?.success && message.data.type === "backup.failed");
+	expect(backupMock).not.toHaveBeenCalled();
+	expect(failed?.success).toBe(true);
+	if (failed?.success && failed.data.type === "backup.failed") {
+		expect(failed.data.payload.errorDetails).toContain("pre webhook returned HTTP 500");
+	}
+});
+
+test("reports a post-backup webhook failure as completed warning details", async () => {
+	server.use(
+		http.post("http://localhost:8080/post", () => {
+			return new HttpResponse("start failed", { status: 500 });
+		}),
+	);
+	vi.spyOn(resticServer, "createRestic").mockReturnValue(
+		fromPartial({
+			backup: () => Effect.succeed({ exitCode: 0, result: null, warningDetails: null }),
+		}),
+	);
+
+	const messages = await runBackupCommand(
+		createRunPayload({
+			webhooks: {
+				pre: null,
+				post: { url: "http://localhost:8080/post" },
+			},
+		}),
+	);
+
+	const completed = messages.find((message) => message?.success && message.data.type === "backup.completed");
+	expect(completed?.success).toBe(true);
+	if (completed?.success && completed.data.type === "backup.completed") {
+		expect(completed.data.payload.warningDetails).toContain("post webhook returned HTTP 500");
+	}
+});
+
+test("includes post-backup webhook failure details when a backup is cancelled", async () => {
+	server.use(
+		http.post("http://localhost:8080/post", () => {
+			return new HttpResponse("start failed", { status: 500 });
+		}),
+	);
+	vi.spyOn(resticServer, "createRestic").mockReturnValue(
+		fromPartial({
+			backup: (_config: unknown, _source: string, options: { signal: AbortSignal }) =>
+				Effect.sync(() => {
+					vi.spyOn(options.signal, "aborted", "get").mockReturnValue(true);
+					vi.spyOn(options.signal, "reason", "get").mockReturnValue(new Error("Backup was cancelled"));
+					return { exitCode: 0, result: null, warningDetails: null };
+				}),
+		}),
+	);
+
+	const messages = await runBackupCommand(
+		createRunPayload({
+			webhooks: {
+				pre: null,
+				post: { url: "http://localhost:8080/post" },
+			},
+		}),
+	);
+
+	const cancelled = messages.find((message) => message?.success && message.data.type === "backup.cancelled");
+	expect(cancelled?.success).toBe(true);
+	if (cancelled?.success && cancelled.data.type === "backup.cancelled") {
+		expect(cancelled.data.payload.message).toContain("post webhook returned HTTP 500: start failed");
+	}
 });
 
 test("waits for running-job registration before returning to the processor loop", async () => {
@@ -78,6 +333,7 @@ test("waits for running-job registration before returning to the processor loop"
 			passFile: "/tmp/restic-pass",
 			defaultExcludes: [],
 		},
+		webhooks: { pre: null, post: null },
 	});
 	const cancelPayload = fromPartial<BackupCancelPayload>({
 		jobId: "job-1",
