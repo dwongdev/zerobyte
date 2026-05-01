@@ -109,6 +109,7 @@ Zerobyte can be customized using environment variables. Below are the available 
 | `TZ`                  | Timezone for the container (e.g., `Europe/Zurich`). **Crucial for accurate backup scheduling.**                                           | `UTC`                  |
 | `TRUST_PROXY`         | When `true`, trust an existing `X-Forwarded-For` header from your reverse proxy. Leave `false` for direct deployments.                    | `false`                |
 | `TRUSTED_ORIGINS`     | Comma-separated list of extra trusted origins for CORS (e.g., `http://localhost:3000,http://example.com`).                                | (none)                 |
+| `WEBHOOK_ALLOWED_ORIGINS` | Comma-separated list of HTTP origins allowed for backup webhooks and outbound HTTP notification destinations.                          | (none)                 |
 | `LOG_LEVEL`           | Logging verbosity. Options: `debug`, `info`, `warn`, `error`.                                                                             | `info`                 |
 | `SERVER_IDLE_TIMEOUT` | Idle timeout for the server in seconds.                                                                                                   | `60`                   |
 | `RCLONE_CONFIG_DIR`   | Path to the directory containing `rclone.conf` inside the container. Change this if running as a non-root user.                           | `/root/.config/rclone` |
