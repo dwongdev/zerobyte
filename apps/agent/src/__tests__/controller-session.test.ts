@@ -48,6 +48,7 @@ test("emits backup.failed when a backup command hits a restic error", async () =
 				},
 				webhooks: { pre: null, post: null },
 				webhookAllowedOrigins: [],
+				webhookTimeoutMs: 60_000,
 			}),
 		);
 

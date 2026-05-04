@@ -42,6 +42,7 @@ const backupRunSchema = z.object({
 		runtime: backupRuntimeSchema,
 		webhooks: backupWebhooksSchema,
 		webhookAllowedOrigins: z.array(z.string()),
+		webhookTimeoutMs: z.number(),
 	}),
 });
 

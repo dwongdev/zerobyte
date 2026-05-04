@@ -3,7 +3,6 @@ import { z } from "zod";
 import type { CompressionMode, RepositoryConfig, ResticBackupProgressDto } from "../restic/index.js";
 import { toErrorDetails, toMessage } from "../utils/index.js";
 
-const DEFAULT_BACKUP_WEBHOOK_TIMEOUT_MS = 10_000;
 const MAX_BACKUP_WEBHOOK_BODY_BYTES = 64 * 1024;
 const MAX_BACKUP_WEBHOOK_HEADERS = 32;
 const MAX_BACKUP_WEBHOOK_HEADER_BYTES = 8 * 1024;
@@ -82,6 +81,7 @@ type BackupLifecycleOptions<TResult> = {
 	options: BackupOptions;
 	webhooks: BackupWebhooks;
 	webhookAllowedOrigins: readonly string[];
+	webhookTimeoutMs: number;
 	signal: AbortSignal;
 	onProgress?: (progress: ResticBackupProgressDto) => void;
 	formatError?: (error: unknown) => string;
@@ -190,7 +190,7 @@ const runBackupWebhook = (
 		formatError: (error: unknown) => string;
 		allowedOrigins: readonly string[];
 		signal?: AbortSignal;
-		timeoutMs?: number;
+		timeoutMs: number;
 	},
 ) =>
 	Effect.suspend(() => {
@@ -198,8 +198,7 @@ const runBackupWebhook = (
 			return Effect.succeed(null);
 		}
 
-		const timeoutMs = options.timeoutMs ?? DEFAULT_BACKUP_WEBHOOK_TIMEOUT_MS;
-		const controller = createAbortController(timeoutMs, options.signal);
+		const controller = createAbortController(options.timeoutMs, options.signal);
 
 		return Effect.tryPromise({
 			try: async () => {
@@ -256,6 +255,7 @@ export const runBackupLifecycle = <TResult>({
 	options,
 	webhooks,
 	webhookAllowedOrigins,
+	webhookTimeoutMs,
 	signal,
 	onProgress,
 	formatError = toErrorDetails,
@@ -268,6 +268,7 @@ export const runBackupLifecycle = <TResult>({
 			{
 				formatError,
 				allowedOrigins: webhookAllowedOrigins,
+				timeoutMs: webhookTimeoutMs,
 				signal,
 			},
 		);
@@ -312,7 +313,7 @@ export const runBackupLifecycle = <TResult>({
 				status: backupResult.hookStatus,
 				error: backupResult.hookError,
 			},
-			{ formatError, allowedOrigins: webhookAllowedOrigins },
+			{ formatError, allowedOrigins: webhookAllowedOrigins, timeoutMs: webhookTimeoutMs },
 		);
 
 		if (signal.aborted) {

@@ -45,6 +45,7 @@ const runWithHooks = <TResult>(
 			options: {},
 			webhooks: { pre: null, post: null },
 			webhookAllowedOrigins: ["http://localhost:8080"],
+			webhookTimeoutMs: 60_000,
 			signal: defaultSignal(),
 			...options,
 		}),

@@ -67,6 +67,7 @@ export const handleBackupRunCommand = (context: ControllerCommandContext, payloa
 					options: payload.options,
 					webhooks: payload.webhooks,
 					webhookAllowedOrigins: payload.webhookAllowedOrigins,
+					webhookTimeoutMs: payload.webhookTimeoutMs,
 					signal: abortController.signal,
 					onProgress: (progress) => {
 						void Runtime.runPromise(

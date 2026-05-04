@@ -146,6 +146,7 @@ test("close emits a synthetic backup.cancelled for a queued backup", () => {
 			},
 			webhooks: { pre: null, post: null },
 			webhookAllowedOrigins: [],
+			webhookTimeoutMs: 60_000,
 		}),
 	);
 

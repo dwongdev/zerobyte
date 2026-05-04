@@ -54,6 +54,7 @@ const createRunPayload = (overrides: Partial<BackupRunPayload> = {}) =>
 		},
 		webhooks: { pre: null, post: null },
 		webhookAllowedOrigins: ["http://localhost:8080"],
+		webhookTimeoutMs: 60_000,
 		...overrides,
 	});
 
@@ -337,6 +338,7 @@ test("waits for running-job registration before returning to the processor loop"
 		},
 		webhooks: { pre: null, post: null },
 		webhookAllowedOrigins: [],
+		webhookTimeoutMs: 60_000,
 	});
 	const cancelPayload = fromPartial<BackupCancelPayload>({
 		jobId: "job-1",

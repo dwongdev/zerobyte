@@ -64,6 +64,7 @@ const createBackupRunPayload = async ({
 		},
 		webhooks: schedule.backupWebhooks ?? { pre: null, post: null },
 		webhookAllowedOrigins: config.webhookAllowedOrigins,
+		webhookTimeoutMs: config.webhookTimeout * 1000,
 	};
 };
 
@@ -82,6 +83,7 @@ const executeBackupWithoutAgent = async (
 			options: payload.options,
 			webhooks: payload.webhooks,
 			webhookAllowedOrigins: payload.webhookAllowedOrigins,
+			webhookTimeoutMs: payload.webhookTimeoutMs,
 			signal,
 			onProgress,
 			formatError: toErrorDetails,
