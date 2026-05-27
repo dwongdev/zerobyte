@@ -99,22 +99,22 @@ Zerobyte can be customized using environment variables. Below are the available 
 
 ### Environment variables
 
-| Variable              | Description                                                                                                                               | Default                |
-| :-------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- | :--------------------- |
-| `BASE_URL`            | **Required.** The base URL of your Zerobyte instance (e.g., `https://zerobyte.example.com`). See [Authentication](#authentication) below. | (none)                 |
-| `APP_SECRET`          | **Required.** A random secret key (32+ chars) used to encrypt sensitive data in the database. Generate with `openssl rand -hex 32`.       | (none)                 |
-| `APP_SECRET_FILE`     | Path to a file containing `APP_SECRET`, useful with Docker or Kubernetes secrets. Mutually exclusive with `APP_SECRET`.                   | (none)                 |
-| `PORT`                | The port the web interface and API will listen on.                                                                                        | `4096`                 |
-| `RESTIC_HOSTNAME`     | The hostname used by Restic when creating snapshots. Automatically detected if a custom hostname is set in Docker.                        | `zerobyte`             |
-| `TZ`                  | Timezone for the container (e.g., `Europe/Zurich`). **Crucial for accurate backup scheduling.**                                           | `UTC`                  |
-| `TRUST_PROXY`         | When `true`, trust an existing `X-Forwarded-For` header from your reverse proxy. Leave `false` for direct deployments.                    | `false`                |
-| `TRUSTED_ORIGINS`     | Comma-separated list of extra trusted origins for CORS (e.g., `http://localhost:3000,http://example.com`).                                | (none)                 |
-| `WEBHOOK_ALLOWED_ORIGINS` | Comma-separated list of HTTP origins allowed for backup webhooks and outbound HTTP notification destinations.                          | (none)                 |
-| `WEBHOOK_TIMEOUT`     | Timeout for backup webhook requests in seconds.                                                                                           | `60`                   |
-| `LOG_LEVEL`           | Logging verbosity. Options: `debug`, `info`, `warn`, `error`.                                                                             | `info`                 |
-| `SERVER_IDLE_TIMEOUT` | Idle timeout for the server in seconds.                                                                                                   | `60`                   |
-| `RCLONE_CONFIG_DIR`   | Path to the directory containing `rclone.conf` inside the container. Change this if running as a non-root user.                           | `/root/.config/rclone` |
-| `PROVISIONING_PATH`   | Path to a JSON file with operator-managed repositories and volumes to sync at startup.                                                    | (none)                 |
+| Variable                  | Description                                                                                                                               | Default                |
+| :------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------- | :--------------------- |
+| `BASE_URL`                | **Required.** The base URL of your Zerobyte instance (e.g., `https://zerobyte.example.com`). See [Authentication](#authentication) below. | (none)                 |
+| `APP_SECRET`              | **Required.** A random secret key (32+ chars) used to encrypt sensitive data in the database. Generate with `openssl rand -hex 32`.       | (none)                 |
+| `APP_SECRET_FILE`         | Path to a file containing `APP_SECRET`, useful with Docker or Kubernetes secrets. Mutually exclusive with `APP_SECRET`.                   | (none)                 |
+| `PORT`                    | The port the web interface and API will listen on.                                                                                        | `4096`                 |
+| `RESTIC_HOSTNAME`         | The hostname used by Restic when creating snapshots. Automatically detected if a custom hostname is set in Docker.                        | `zerobyte`             |
+| `TZ`                      | Timezone for the container (e.g., `Europe/Zurich`). **Crucial for accurate backup scheduling.**                                           | `UTC`                  |
+| `TRUST_PROXY`             | When `true`, trust an existing `X-Forwarded-For` header from your reverse proxy. Leave `false` for direct deployments.                    | `false`                |
+| `TRUSTED_ORIGINS`         | Comma-separated list of extra trusted origins for CORS (e.g., `http://localhost:3000,http://example.com`).                                | (none)                 |
+| `WEBHOOK_ALLOWED_ORIGINS` | Comma-separated list of HTTP origins allowed for backup webhooks and outbound HTTP notification destinations.                             | (none)                 |
+| `WEBHOOK_TIMEOUT`         | Timeout for backup webhook requests in seconds.                                                                                           | `60`                   |
+| `LOG_LEVEL`               | Logging verbosity. Options: `debug`, `info`, `warn`, `error`.                                                                             | `info`                 |
+| `SERVER_IDLE_TIMEOUT`     | Idle timeout for the server in seconds.                                                                                                   | `60`                   |
+| `RCLONE_CONFIG_DIR`       | Path to the directory containing `rclone.conf` inside the container. Change this if running as a non-root user.                           | `/root/.config/rclone` |
+| `PROVISIONING_PATH`       | Path to a JSON file with operator-managed repositories and volumes to sync at startup.                                                    | (none)                 |
 
 ### Webhook and notification network policy
 
@@ -398,7 +398,7 @@ RESTIC_PASS_FILE=./data/restic.pass
 RESTIC_CACHE_DIR=./data/restic/cache
 ZEROBYTE_REPOSITORIES_DIR=./data/repositories
 ZEROBYTE_VOLUMES_DIR=./data/volumes
-BASE_URL=http://localhost:4096
+BASE_URL=https://*.localhost
 ```
 
 Notes:
