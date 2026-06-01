@@ -1,14 +1,16 @@
 import path from "node:path";
 import type { BackupRunPayload } from "@zerobyte/contracts/agent-protocol";
-import { hasUnsupportedPathCharacter } from "@zerobyte/core/utils";
+import { hasPathListSeparator } from "@zerobyte/core/utils";
 
 type BackupOptions = BackupRunPayload["options"];
 
-export const processPattern = (pattern: string, volumePath: string, relative = false) => {
-	if (relative && hasUnsupportedPathCharacter(pattern)) {
-		throw new Error(`Include pattern contains an unsupported path character: ${pattern}`);
+const validateIncludeEntry = (entry: string, name: string, format: "raw" | "text") => {
+	if (hasPathListSeparator(entry, format)) {
+		throw new Error(`${name} contains an unsupported path character: ${entry}`);
 	}
+};
 
+export const processPattern = (pattern: string, volumePath: string, relative = false) => {
 	const isNegated = pattern.startsWith("!");
 	const p = isNegated ? pattern.slice(1) : pattern;
 
@@ -46,8 +48,16 @@ export const createBackupOptions = (
 	signal,
 	exclude: params.options.excludePatterns?.map((p) => processPattern(p, volumePath)) ?? undefined,
 	excludeIfPresent: params.options.excludeIfPresent ?? undefined,
-	includePaths: params.options.includePaths?.map((p) => processPattern(p, volumePath, true)) ?? undefined,
-	includePatterns: params.options.includePatterns?.map((p) => processPattern(p, volumePath, true)) ?? undefined,
+	includePaths:
+		params.options.includePaths?.map((p) => {
+			validateIncludeEntry(p, "Include path", "raw");
+			return processPattern(p, volumePath, true);
+		}) ?? undefined,
+	includePatterns:
+		params.options.includePatterns?.map((p) => {
+			validateIncludeEntry(p, "Include pattern", "text");
+			return processPattern(p, volumePath, true);
+		}) ?? undefined,
 	customResticParams: params.options.customResticParams ?? [],
 	compressionMode: params.options.compressionMode,
 });

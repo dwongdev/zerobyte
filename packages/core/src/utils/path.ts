@@ -58,5 +58,5 @@ export const isPathWithin = (base: string, target: string): boolean => {
 	);
 };
 
-export const hasUnsupportedPathCharacter = (value: string) =>
-	value.includes("\u0000") || value.includes("\n") || value.includes("\r");
+export const hasPathListSeparator = (value: string, format: "raw" | "text") =>
+	value.includes("\u0000") || (format === "text" && (value.includes("\n") || value.includes("\r")));
