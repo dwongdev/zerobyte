@@ -2267,6 +2267,7 @@ export type RestoreSnapshotData = {
         excludeXattr?: Array<string>;
         delete?: boolean;
         targetPath?: string;
+        targetAgentId?: string;
         overwrite?: 'always' | 'if-changed' | 'if-newer' | 'never';
     };
     path: {
@@ -2278,13 +2279,11 @@ export type RestoreSnapshotData = {
 
 export type RestoreSnapshotResponses = {
     /**
-     * Snapshot restored successfully
+     * Snapshot restore started
      */
-    200: {
-        success: boolean;
-        message: string;
-        filesRestored: number;
-        filesSkipped: number;
+    202: {
+        restoreId: string;
+        status: 'started';
     };
 };
 
