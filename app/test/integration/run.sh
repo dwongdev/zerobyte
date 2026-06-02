@@ -36,7 +36,7 @@ if [[ "$exit_code" -eq 0 ]]; then
 fi
 
 if [[ "$exit_code" -eq 0 ]]; then
-	volume_services=(sftp webdav smb)
+	volume_services=(sftp sftp-legacy-rsa webdav smb)
 	if [[ "${SKIP_VOLUME_MOUNT_INTEGRATION_TESTS:-false}" != "true" ]]; then
 		volume_services+=(nfs)
 	fi

@@ -15,10 +15,12 @@ import { createStaticVolumeFixture } from "./helpers/fixture";
 import { buildNfsVolumeConfig } from "./helpers/nfs";
 import { createIntegrationRestic } from "./helpers/restic";
 import {
+	buildLegacyRsaSftpPasswordVolumeConfig,
 	buildSftpPasswordVolumeConfig,
 	buildSftpPrivateKeyVolumeConfig,
 	readSftpPrivateKey,
 	scanSftpKnownHosts,
+	SFTP_LEGACY_RSA_HOST,
 } from "./helpers/sftp";
 import { buildSmbVolumeConfig } from "./helpers/smb";
 import { buildWebdavVolumeConfig } from "./helpers/webdav";
@@ -46,6 +48,15 @@ const scenarios: VolumeScenario[] = [
 		createBackend: async (mountPath) => {
 			const knownHosts = await scanSftpKnownHosts();
 			const config = buildSftpPasswordVolumeConfig({ knownHosts });
+			return makeSftpBackend(config, mountPath);
+		},
+	},
+	{
+		id: "sftp-legacy-rsa-hostkey-local-repo",
+		name: "SFTP volume with legacy RSA host key and local repository",
+		createBackend: async (mountPath) => {
+			const knownHosts = await scanSftpKnownHosts({ host: SFTP_LEGACY_RSA_HOST, keyType: "rsa" });
+			const config = buildLegacyRsaSftpPasswordVolumeConfig({ knownHosts });
 			return makeSftpBackend(config, mountPath);
 		},
 	},

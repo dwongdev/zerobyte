@@ -39,6 +39,23 @@ services:
       timeout: 5s
       retries: 30
 
+  sftp-legacy-rsa:
+    build:
+      context: ./sftp
+    environment:
+      SFTP_USER: "zerobyte-sftp"
+      SFTP_PASSWORD: "zerobyte-sftp-password"
+      SFTP_PUBLIC_KEY_PATH: "/run/zerobyte/sftp/id_ed25519.pub"
+      SFTP_LEGACY_RSA_HOSTKEY: "true"
+    volumes:
+      - ../artifacts/sftp/id_ed25519.pub:/run/zerobyte/sftp/id_ed25519.pub:ro
+      - sftp-legacy-rsa-data:/srv/zerobyte-integration
+    healthcheck:
+      test: ["CMD", "ssh-keyscan", "-T", "2", "-t", "rsa", "localhost"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
   webdav:
     build:
       context: ./webdav
@@ -104,6 +121,8 @@ services:
         condition: service_completed_successfully
       sftp:
         condition: service_healthy
+      sftp-legacy-rsa:
+        condition: service_healthy
       webdav:
         condition: service_healthy
       smb:
@@ -125,4 +144,5 @@ services:
 volumes:
   rustfs-data:
   sftp-data:
+  sftp-legacy-rsa-data:
   nfs-data:

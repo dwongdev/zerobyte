@@ -4,6 +4,7 @@ import { safeExec } from "@zerobyte/core/node";
 import type { RepositoryConfig } from "@zerobyte/core/restic";
 
 export const SFTP_HOST = "sftp";
+export const SFTP_LEGACY_RSA_HOST = "sftp-legacy-rsa";
 export const SFTP_PORT = 22;
 export const SFTP_USERNAME = "zerobyte-sftp";
 export const SFTP_PASSWORD = "zerobyte-sftp-password";
@@ -19,10 +20,14 @@ export const readSftpPrivateKey = async () => {
 	return fs.readFile(privateKeyPath, "utf8");
 };
 
-export const scanSftpKnownHosts = async () => {
+export const scanSftpKnownHosts = async ({ host = SFTP_HOST, keyType }: { host?: string; keyType?: string } = {}) => {
+	const args = ["-T", "5"];
+	if (keyType) args.push("-t", keyType);
+	args.push(host);
+
 	const result = await safeExec({
 		command: "ssh-keyscan",
-		args: ["-T", "5", SFTP_HOST],
+		args,
 		timeout: 10_000,
 	});
 
@@ -63,6 +68,19 @@ export const buildSftpPasswordVolumeConfig = ({ knownHosts }: { knownHosts: stri
 	skipHostKeyCheck: false,
 	knownHosts,
 	allowLegacySshRsa: false,
+});
+
+export const buildLegacyRsaSftpPasswordVolumeConfig = ({ knownHosts }: { knownHosts: string }): BackendConfig => ({
+	backend: "sftp",
+	host: SFTP_LEGACY_RSA_HOST,
+	port: SFTP_PORT,
+	username: SFTP_USERNAME,
+	password: SFTP_PASSWORD,
+	path: SFTP_FIXTURE_ROOT,
+	readOnly: true,
+	skipHostKeyCheck: false,
+	knownHosts,
+	allowLegacySshRsa: true,
 });
 
 export const buildSftpRepositoryConfig = ({
