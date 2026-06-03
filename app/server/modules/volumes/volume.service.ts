@@ -285,13 +285,11 @@ const updateVolume = async (shortId: ShortId, volumeData: UpdateVolumeBody) => {
 };
 
 const testConnection = async (backendConfig: BackendConfig) => {
-	const resolvedConfig = await decryptVolumeConfig(backendConfig);
-
 	if (!config.flags.enableLocalAgent) {
-		return Effect.runPromise(testVolumeConnection(resolvedConfig));
+		return Effect.runPromise(testVolumeConnection(backendConfig));
 	}
 
-	const command = await runVolumeCommand(LOCAL_AGENT_ID, { name: "volume.testConnection", backendConfig: resolvedConfig });
+	const command = await runVolumeCommand(LOCAL_AGENT_ID, { name: "volume.testConnection", backendConfig });
 	return command.result;
 };
 
