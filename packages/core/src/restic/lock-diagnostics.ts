@@ -1,5 +1,6 @@
 import { logger, safeExec } from "../node";
 import { toMessage } from "../utils";
+import { safeJsonParse } from "../utils/json";
 import { ResticLockError } from "./error";
 import { addCommonArgs } from "./helpers/add-common-args";
 import { buildEnv } from "./helpers/build-env";
@@ -34,6 +35,14 @@ export const isResticLockFailure = (error: unknown) => {
 	return LOCK_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 };
 
+const RESTIC_LOCK_ID_PATTERN = /^[a-f0-9]{64}$/i;
+
+const addLockId = (ids: Set<string>, candidate: unknown) => {
+	if (typeof candidate === "string" && RESTIC_LOCK_ID_PATTERN.test(candidate)) {
+		ids.add(candidate);
+	}
+};
+
 const parseLockIds = (stdout: string) => {
 	const ids = new Set<string>();
 
@@ -41,16 +50,13 @@ const parseLockIds = (stdout: string) => {
 		const trimmed = line.trim();
 		if (!trimmed) continue;
 
-		const jsonId = trimmed.match(/"id"\s*:\s*"([^"]+)"/)?.[1];
-		if (jsonId) {
-			ids.add(jsonId);
+		const parsed = safeJsonParse<{ id?: unknown }>(trimmed);
+		if (parsed) {
+			addLockId(ids, parsed.id);
 			continue;
 		}
 
-		const hexId = trimmed.match(/[a-f0-9]{64}/i)?.[0];
-		if (hexId) {
-			ids.add(hexId);
-		}
+		addLockId(ids, trimmed);
 	}
 
 	return [...ids].slice(0, 20);
@@ -76,7 +82,7 @@ const inspectResticLocks = async (config: RepositoryConfig, organizationId: stri
 		for (const lockId of lockIds) {
 			const catResult = await safeExec({
 				command: "restic",
-				args: [...baseArgs, "cat", "lock", lockId],
+				args: [...baseArgs, "cat", "lock", "--", lockId],
 				env,
 				timeout: 15_000,
 			});
