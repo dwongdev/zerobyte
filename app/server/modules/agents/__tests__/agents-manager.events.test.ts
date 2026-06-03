@@ -106,6 +106,41 @@ test("backup progress is delivered to the running backup callback", async () => 
 	await stopAgentController();
 });
 
+test("backup events from agents that do not own the active run are ignored", async () => {
+	resetAgentRuntime();
+	controllerMock.sendBackup.mockImplementation(() => Effect.succeed(true));
+	const { agentManager, startAgentController, stopAgentController } = await import("../agents-manager");
+
+	await startAgentController();
+	const resultPromise = agentManager.runBackup("local", {
+		scheduleId: 42,
+		payload: backupPayload,
+		signal: new AbortController().signal,
+		onProgress: vi.fn(),
+	});
+
+	controllerMock.onEvent?.({
+		type: "backup.completed",
+		agentId: "remote",
+		agentName: "Remote Agent",
+		payload: { jobId: "job-1", scheduleId: "schedule-1", exitCode: 0, result: null },
+	});
+	controllerMock.onEvent?.({
+		type: "backup.completed",
+		agentId: "local",
+		agentName: "Local Agent",
+		payload: { jobId: "job-1", scheduleId: "schedule-1", exitCode: 0, result: null },
+	});
+
+	await expect(resultPromise).resolves.toEqual({
+		status: "completed",
+		exitCode: 0,
+		result: null,
+		warningDetails: null,
+	});
+	await stopAgentController();
+});
+
 test("backup failed and cancelled events resolve the matching running backup", async () => {
 	resetAgentRuntime();
 	controllerMock.sendBackup.mockImplementation(() => Effect.succeed(true));

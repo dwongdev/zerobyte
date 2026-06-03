@@ -152,6 +152,11 @@ const getActiveBackupRun = (jobId: string, scheduleId: string, eventName: string
 		return null;
 	}
 
+	if (activeBackupRun.agentId !== agentId) {
+		logger.warn(`Ignoring ${eventName} for job ${jobId} from unexpected agent ${agentId}`);
+		return null;
+	}
+
 	return activeBackupRun;
 };
 
