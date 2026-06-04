@@ -16,7 +16,6 @@ import { stats } from "./commands/stats";
 import { tagSnapshots } from "./commands/tag-snapshots";
 import { unlock } from "./commands/unlock";
 import { ResticLockError } from "./error";
-import { logResticLockFailureDiagnostics } from "./lock-diagnostics";
 import type { RepositoryConfig } from "./schemas";
 import type { ResticDeps } from "./types";
 
@@ -25,17 +24,14 @@ export { buildEnv } from "./helpers/build-env";
 export { buildRepoUrl } from "./helpers/build-repo-url";
 export { cleanupTemporaryKeys } from "./helpers/cleanup-temporary-keys";
 export { validateCustomResticParams } from "./helpers/validate-custom-params";
-export { isResticLockFailure, logResticLockFailureDiagnostics } from "./lock-diagnostics";
 export { isResticError, ResticError, ResticLockError } from "./error";
 
-type LockDiagnosticCommandContext = {
-	repositoryConfig: RepositoryConfig;
+type LockRecoveryContext = {
+	repositoryConfigs: RepositoryConfig[];
 	organizationId: string;
-	relatedRepositoryConfigs?: RepositoryConfig[];
 };
 
 type ResticCommandOptions = { organizationId: string };
-type ResticCommandResult = { error?: unknown };
 type ResticCommandFailure<Failure> = Failure | ResticLockError;
 type RunResticCommand<Success, Failure, Requirements> = () => Effect.Effect<
 	Success,
@@ -43,56 +39,37 @@ type RunResticCommand<Success, Failure, Requirements> = () => Effect.Effect<
 	Requirements
 >;
 
-const getCommandContext = (operation: string, args: unknown[]): LockDiagnosticCommandContext => {
+const getLockRecoveryContext = (operation: string, args: unknown[]): LockRecoveryContext => {
 	const firstRepositoryConfig = args[0] as RepositoryConfig;
 	const options = args.at(-1) as ResticCommandOptions;
 
 	if (operation === "restic.copy") {
 		return {
-			repositoryConfig: args[1] as RepositoryConfig,
+			repositoryConfigs: [args[1] as RepositoryConfig, firstRepositoryConfig],
 			organizationId: options.organizationId,
-			relatedRepositoryConfigs: [firstRepositoryConfig],
 		};
 	}
 
 	return {
-		repositoryConfig: firstRepositoryConfig,
+		repositoryConfigs: [firstRepositoryConfig],
 		organizationId: options.organizationId,
 	};
 };
 
-const logLockFailure = async (
-	error: unknown,
-	operation: string,
-	context: LockDiagnosticCommandContext,
-	deps: ResticDeps,
-) =>
-	logResticLockFailureDiagnostics({
-		error,
-		operation,
-		repositoryConfig: context.repositoryConfig,
-		organizationId: context.organizationId,
-		resticDeps: deps,
-		relatedRepositoryConfigs: context.relatedRepositoryConfigs,
-	});
-
-const unlockStaleLocks = (context: LockDiagnosticCommandContext, deps: ResticDeps): Effect.Effect<void, Error> =>
+const unlockStaleLocks = (context: LockRecoveryContext, deps: ResticDeps) =>
 	Effect.gen(function* () {
-		for (const repositoryConfig of [context.repositoryConfig, ...(context.relatedRepositoryConfigs ?? [])]) {
+		for (const repositoryConfig of context.repositoryConfigs) {
 			yield* unlock(repositoryConfig, { organizationId: context.organizationId }, deps);
 		}
-	});
+	}).pipe(Effect.catchAll(() => Effect.void));
 
 const recoverFromLockFailure = <Success, Failure, Requirements>(
-	error: ResticLockError,
-	operation: string,
-	context: LockDiagnosticCommandContext,
-	deps: ResticDeps,
+	context: LockRecoveryContext,
 	runCommand: RunResticCommand<Success, Failure, Requirements>,
+	deps: ResticDeps,
 ): Effect.Effect<Success, ResticCommandFailure<Failure> | Error, Requirements> =>
 	Effect.gen(function* () {
 		yield* logger.effect.warn("Restic lock failure detected. Removing stale locks and retrying once.");
-		yield* Effect.promise(() => logLockFailure(error, operation, context, deps));
 		yield* unlockStaleLocks(context, deps);
 
 		const retryResult = yield* runCommand();
@@ -107,20 +84,11 @@ function withDeps<Args extends unknown[], Success, Failure, Requirements>(
 	deps: ResticDeps,
 ): (...args: Args) => Effect.Effect<Success, ResticCommandFailure<Failure> | Error, Requirements> {
 	return (...args: Args) => {
-		const context = getCommandContext(operation, args);
+		const context = getLockRecoveryContext(operation, args);
 		const runCommand = () => command(...args, deps);
 
-		const commandEffect = runCommand().pipe(
-			Effect.catchTag("ResticLockError", (error) =>
-				recoverFromLockFailure(error as ResticLockError, operation, context, deps, runCommand),
-			),
-		);
-
-		return commandEffect.pipe(
-			Effect.tap((result) => {
-				const { error } = result as ResticCommandResult;
-				return error ? Effect.promise(() => logLockFailure(error, operation, context, deps)) : Effect.void;
-			}),
+		return runCommand().pipe(
+			Effect.catchTag("ResticLockError", () => recoverFromLockFailure(context, runCommand, deps)),
 		);
 	};
 }
