@@ -42,6 +42,7 @@ import type { ParsedTask, TaskInput } from "../tasks/tasks.schemas";
 import { Effect } from "effect";
 
 const runningDoctors = new Map<string, AbortController>();
+const lsLimiters = new Map<string, Effect.Semaphore>();
 const RESTORE_TASK_RESOURCE_TYPE = "repository";
 
 type RestoreTaskInput = Extract<TaskInput, { kind: "restore" }>;
@@ -97,6 +98,15 @@ const updateActiveRestoreTask = (restoreId: string, eventName: string, update: (
 		logger.warn(`Received ${eventName} for inactive restore ${restoreId}: ${toMessage(error)}`);
 		return null;
 	}
+};
+
+const getLsLimiter = (repositoryId: string) => {
+	let limiter = lsLimiters.get(repositoryId);
+	if (!limiter) {
+		limiter = Effect.runSync(Effect.makeSemaphore(2));
+		lsLimiters.set(repositoryId, limiter);
+	}
+	return limiter;
 };
 
 const findActiveRestoreTask = (
@@ -469,36 +479,43 @@ const listSnapshotFiles = async (
 		};
 	}
 
-	const releaseLock = await repoMutex.acquireShared(repository.id, `ls:${snapshotId}`);
+	const limiter = getLsLimiter(repository.id);
+	await runEffectPromise(limiter.take(1));
+
 	try {
-		const result = await runEffectPromise(
-			restic.ls(repository.config, snapshotId, path, { organizationId, offset, limit }),
-		);
+		const releaseLock = await repoMutex.acquireShared(repository.id, `ls:${snapshotId}`);
+		try {
+			const result = await runEffectPromise(
+				restic.ls(repository.config, snapshotId, path, { organizationId, offset, limit }),
+			);
 
-		if (!result.snapshot) {
-			throw new NotFoundError("Snapshot not found or empty");
+			if (!result.snapshot) {
+				throw new NotFoundError("Snapshot not found or empty");
+			}
+
+			const response = {
+				snapshot: {
+					id: result.snapshot.id,
+					short_id: result.snapshot.short_id,
+					time: result.snapshot.time,
+					hostname: result.snapshot.hostname,
+					paths: result.snapshot.paths,
+				},
+				files: result.nodes,
+				offset: result.pagination.offset,
+				limit: result.pagination.limit,
+				total: result.pagination.total,
+				hasMore: result.pagination.hasMore,
+			};
+
+			cache.set(cacheKey, result);
+
+			return response;
+		} finally {
+			releaseLock();
 		}
-
-		const response = {
-			snapshot: {
-				id: result.snapshot.id,
-				short_id: result.snapshot.short_id,
-				time: result.snapshot.time,
-				hostname: result.snapshot.hostname,
-				paths: result.snapshot.paths,
-			},
-			files: result.nodes,
-			offset: result.pagination.offset,
-			limit: result.pagination.limit,
-			total: result.pagination.total,
-			hasMore: result.pagination.hasMore,
-		};
-
-		cache.set(cacheKey, result);
-
-		return response;
 	} finally {
-		releaseLock();
+		await runEffectPromise(limiter.release(1));
 	}
 };
 

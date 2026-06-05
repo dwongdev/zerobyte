@@ -208,6 +208,141 @@ describe("repositoriesService repository stats", () => {
 	});
 });
 
+describe("repositoriesService.listSnapshotFiles", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	test("limits concurrent restic ls commands per repository", async () => {
+		const repository = await createTestRepository(session.organizationId);
+		let active = 0;
+		let maxActive = 0;
+		let releaseAll = false;
+		let exclusiveAcquired = false;
+		let releaseExclusive: (() => void) | undefined;
+		let exclusivePromise: Promise<() => void> | undefined;
+		const releaseWaiters: Array<() => void> = [];
+		const exclusiveController = new AbortController();
+
+		const releaseWaitingCommands = () => {
+			const waiters = releaseWaiters.splice(0);
+			for (const release of waiters) {
+				release();
+			}
+		};
+
+		const resolveWithin = async <T>(promise: Promise<T>, timeoutMs: number) => {
+			return await new Promise<T>((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(new Error(`Expected promise to resolve within ${timeoutMs}ms`));
+				}, timeoutMs);
+
+				promise.then(
+					(value) => {
+						clearTimeout(timeout);
+						resolve(value);
+					},
+					(error) => {
+						clearTimeout(timeout);
+						reject(error);
+					},
+				);
+			});
+		};
+
+		const lsSpy = vi.spyOn(restic, "ls").mockImplementation((_config, snapshotId, _path, options) =>
+			Effect.promise(async () => {
+				active++;
+				maxActive = Math.max(maxActive, active);
+
+				try {
+					if (!releaseAll) {
+						await new Promise<void>((resolve) => releaseWaiters.push(resolve));
+					}
+
+					return {
+						snapshot: {
+							id: snapshotId,
+							short_id: snapshotId,
+							time: new Date().toISOString(),
+							tree: "tree",
+							paths: ["/"],
+							hostname: "host",
+							struct_type: "snapshot" as const,
+							message_type: "snapshot" as const,
+						},
+						nodes: [],
+						pagination: {
+							offset: options.offset ?? 0,
+							limit: options.limit ?? 500,
+							total: 0,
+							hasMore: false,
+						},
+					};
+				} finally {
+					active--;
+				}
+			}),
+		);
+
+		const calls = Array.from({ length: 4 }, (_, index) =>
+			withContext({ organizationId: session.organizationId, userId: session.user.id }, () =>
+				repositoriesService.listSnapshotFiles(repository.shortId, `snapshot-${index}`, "/", {
+					offset: 0,
+					limit: 100,
+				}),
+			),
+		);
+
+		try {
+			await waitForExpect(() => {
+				expect(releaseWaiters).toHaveLength(2);
+			});
+			expect(maxActive).toBe(2);
+
+			exclusivePromise = repoMutex
+				.acquireExclusive(repository.id, "delete", exclusiveController.signal)
+				.then((release) => {
+					exclusiveAcquired = true;
+					releaseExclusive = release;
+					return release;
+				});
+
+			releaseWaitingCommands();
+
+			releaseExclusive = await resolveWithin(exclusivePromise, 2000);
+			expect(exclusiveAcquired).toBe(true);
+			expect(active).toBe(0);
+
+			releaseExclusive();
+			releaseExclusive = undefined;
+
+			await waitForExpect(() => {
+				expect(releaseWaiters).toHaveLength(2);
+			});
+			expect(maxActive).toBe(2);
+
+			releaseWaitingCommands();
+			await Promise.all(calls);
+		} finally {
+			if (releaseExclusive) {
+				releaseExclusive();
+			} else {
+				exclusiveController.abort();
+			}
+			releaseAll = true;
+			releaseWaitingCommands();
+			await Promise.allSettled(calls);
+			if (exclusivePromise) {
+				await Promise.allSettled([exclusivePromise]);
+			}
+		}
+
+		expect(lsSpy).toHaveBeenCalledTimes(4);
+		expect(maxActive).toBeLessThanOrEqual(2);
+	});
+});
+
 describe("repositoriesService.dumpSnapshot", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
