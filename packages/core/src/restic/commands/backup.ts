@@ -132,13 +132,23 @@ export const backup = (
 				args.push("--", source);
 			}
 
+			const stderrLines: string[] = [];
 			const logData = throttle((data: string) => {
 				logger.info(data.trim());
 			}, 5000);
-			const stderrLines: string[] = [];
 
-			const streamProgress = throttle((data: string) => {
-				if (options.onProgress) {
+			logger.debug(`Executing: restic ${args.join(" ")}`);
+			const res = await safeSpawn({
+				command: "restic",
+				args,
+				env: { ...env, RESTIC_PROGRESS_FPS: "1" },
+				signal: options.signal,
+				onStdout: (data) => {
+					logData(data);
+					if (!options.onProgress) {
+						return;
+					}
+
 					try {
 						const jsonData = JSON.parse(data);
 						if (jsonData.message_type !== "status") {
@@ -153,20 +163,6 @@ export const backup = (
 						}
 					} catch {
 						// Ignore JSON parse errors for non-JSON lines
-					}
-				}
-			}, 1000);
-
-			logger.debug(`Executing: restic ${args.join(" ")}`);
-			const res = await safeSpawn({
-				command: "restic",
-				args,
-				env,
-				signal: options.signal,
-				onStdout: (data) => {
-					logData(data);
-					if (options.onProgress) {
-						streamProgress(data);
 					}
 				},
 				onStderr: (error) => {

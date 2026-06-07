@@ -26,10 +26,16 @@ export const buildEnv = async (
 	organizationId: string,
 	deps: ResticDeps,
 ): Promise<ResticEnv> => {
+	const goMaxProcs = Number(process.env.GOMAXPROCS);
+
 	const env: ResticEnv = {
 		RESTIC_CACHE_DIR: deps.resticCacheDir,
 		PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
 	};
+	if (Number.isInteger(goMaxProcs) && goMaxProcs > 0) {
+		env.GOMAXPROCS = goMaxProcs.toString();
+	}
+
 	let runtimeSecretsDir: string | undefined;
 	const getRuntimeSecretPath = async (filename: string) => {
 		if (!runtimeSecretsDir) {
