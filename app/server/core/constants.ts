@@ -14,6 +14,6 @@ export const RCLONE_CONFIG_DIR = process.env.RCLONE_CONFIG_DIR || "/root/.config
 export const RCLONE_CONFIG_FILE = path.join(RCLONE_CONFIG_DIR, "rclone.conf");
 export const RESTORE_BLOCKED_ROOTS = [REPOSITORY_BASE, RESTIC_CACHE_DIR, RCLONE_CONFIG_DIR, "/app"];
 
-export const DEFAULT_EXCLUDES = [RESTIC_PASS_FILE, REPOSITORY_BASE];
+export const DEFAULT_EXCLUDES = [RESTIC_PASS_FILE, REPOSITORY_BASE, RESTIC_CACHE_DIR];
 
 export const REGISTRATION_ENABLED_KEY = "registrations_enabled";
