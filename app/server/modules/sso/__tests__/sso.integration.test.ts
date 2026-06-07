@@ -425,7 +425,7 @@ describe("ssoIntegration.canLinkSsoAccount", () => {
 	);
 
 	test.each(autoLinkingCases)(
-		"allows linking for an existing user account with a pending invitation when auto-linking is $autoLinkingLabel",
+		"blocks linking for an existing user account with a pending invitation when auto-linking is $autoLinkingLabel",
 		async ({ autoLinkingEnabled }) => {
 			const providerId = `oidc-acme-${autoLinkingEnabled ? "on" : "off"}`;
 			const { orgId, ownerId } = await setupOrgWithProvider(providerId, autoLinkingEnabled);
@@ -443,7 +443,7 @@ describe("ssoIntegration.canLinkSsoAccount", () => {
 
 			const allowed = await ssoIntegration.canLinkSsoAccount(userId, providerId);
 
-			expect(allowed).toBe(autoLinkingEnabled);
+			expect(allowed).toBe(false);
 		},
 	);
 

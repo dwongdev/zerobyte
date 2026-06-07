@@ -113,7 +113,7 @@ async function canLinkSsoAccount(userId: string, providerId: string): Promise<bo
 		columns: { id: true },
 	});
 
-	return !existingAccount || ssoProviderRecord.autoLinkMatchingEmails;
+	return !existingAccount;
 }
 
 async function resolveOrgMembershipOrThrow(userId: string, ctx: GenericEndpointContext | null) {

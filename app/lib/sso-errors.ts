@@ -12,10 +12,13 @@ export const LOGIN_ERROR_CODES = [
 
 export type LoginErrorCode = (typeof LOGIN_ERROR_CODES)[number];
 
+export const ACCOUNT_LINK_REQUIRED_DESCRIPTION =
+	"SSO sign-in was blocked because this email already belongs to another user in this instance. Contact your administrator to resolve the account conflict. If you have an invitation to this organization, make sure to accept it from your account page before signing in with SSO.";
+
 export function getLoginErrorDescription(errorCode: LoginErrorCode): string {
 	switch (errorCode) {
 		case "ACCOUNT_LINK_REQUIRED":
-			return "SSO sign-in was blocked because this email already belongs to another user in this instance. Contact your administrator to resolve the account conflict.";
+			return ACCOUNT_LINK_REQUIRED_DESCRIPTION;
 		case "EMAIL_NOT_VERIFIED":
 			return "Your identity provider did not mark your email as verified.";
 		case "INVITE_REQUIRED":

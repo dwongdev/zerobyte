@@ -31,7 +31,7 @@ const existingMemberLocalUsername = "sso-existing-member";
 const inviteOnlyMessage =
 	"Access is invite-only. Ask an organization admin to send you an invitation before signing in with SSO.";
 const accountLinkRequiredMessage =
-	"SSO sign-in was blocked because this email already belongs to another user in this instance. Contact your administrator to resolve the account conflict.";
+	"SSO sign-in was blocked because this email already belongs to another user in this instance. Contact your administrator to resolve the account conflict. If you have an invitation to this organization, make sure to accept it from your account page before signing in with SSO.";
 
 type OrgMembersResponse = {
 	members: {
@@ -131,33 +131,6 @@ async function createLocalUser(browser: Browser, email: string, username: string
 		}
 
 		return body.user.id;
-	} finally {
-		await adminContext.close();
-	}
-}
-
-async function verifyLocalUserEmail(browser: Browser, userId: string) {
-	const adminContext = await browser.newContext({
-		baseURL: appBaseUrl,
-		storageState: setupAuthFile,
-	});
-
-	try {
-		const response = await adminContext.request.post("/api/auth/admin/update-user", {
-			headers: {
-				Origin: appBaseUrl,
-			},
-			data: {
-				userId,
-				data: {
-					emailVerified: true,
-				},
-			},
-		});
-
-		if (!response.ok()) {
-			throw new Error(`Failed to verify local user ${userId}: ${await response.text()}`);
-		}
 	} finally {
 		await adminContext.close();
 	}
@@ -487,7 +460,7 @@ test("invited OIDC users can sign in, retain access, and are blocked after remov
 	});
 });
 
-test("auto-link policy enforces invitation and controls account linking", async ({ page, browser }) => {
+test("auto-link policy requires local acceptance for existing credential accounts", async ({ page, browser }) => {
 	await registerOidcProvider(page, providerIds.autoLinkNoInvite);
 	await createLocalUser(browser, autoLinkUninvitedLocalEmail, autoLinkUninvitedLocalUsername);
 	await setProviderAutoLinking(page, providerIds.autoLinkNoInvite, true);
@@ -508,28 +481,25 @@ test("auto-link policy enforces invitation and controls account linking", async 
 	await setProviderAutoLinking(page, providerIds.autoLink, true);
 
 	await withOidcLoginAttempt(browser, providerIds.autoLink, autoLinkTargetEmail, async (ssoPage) => {
-		await ssoPage.waitForURL(/\/volumes/, { timeout: 30000 });
-		await waitForAppReady(ssoPage);
-		await expect(ssoPage).toHaveURL(/\/volumes/);
+		await expectAccountLinkRequiredLoginError(ssoPage);
 	});
 
 	await expect
 		.poll(async () => {
 			return getInvitationStatusByEmail(page, autoLinkTargetEmail);
 		})
-		.toBe("accepted");
+		.toBe("pending");
 
 	await expect
 		.poll(async () => {
 			return getOrgMemberIdByEmail(page, autoLinkTargetEmail);
 		})
-		.not.toBeNull();
+		.toBeNull();
 });
 
 test("existing local org members can link via SSO without a pending invitation", async ({ page, browser }) => {
 	await registerOidcProvider(page, providerIds.existingMember);
-	const userId = await createLocalUser(browser, existingMemberLocalEmail, existingMemberLocalUsername);
-	await verifyLocalUserEmail(browser, userId);
+	await createLocalUser(browser, existingMemberLocalEmail, existingMemberLocalUsername);
 	await createPendingInvitation(page, existingMemberLocalEmail);
 
 	const invitationId = await getInvitationIdByEmail(page, existingMemberLocalEmail);

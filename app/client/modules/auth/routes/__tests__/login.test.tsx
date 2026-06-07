@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { HttpResponse, http, server } from "~/test/msw/server";
 import { cleanup, render, screen, userEvent, waitFor } from "~/test/test-utils";
-import { getLoginErrorDescription, PASSKEY_LOGIN_FAILED_ERROR } from "~/lib/sso-errors";
+import {
+	ACCOUNT_LINK_REQUIRED_DESCRIPTION,
+	getLoginErrorDescription,
+	PASSKEY_LOGIN_FAILED_ERROR,
+} from "~/lib/sso-errors";
 
 const { mockGetLoginOptions, mockNavigate, mockPasskeySignIn } = vi.hoisted(() => ({
 	mockGetLoginOptions: vi.fn(async () => ({ hasPasskeySignIn: false })),
@@ -85,11 +89,7 @@ describe("LoginPage", () => {
 
 		render(<LoginPage error="ACCOUNT_LINK_REQUIRED" />, { withSuspense: true });
 
-		expect(
-			await screen.findByText(
-				"SSO sign-in was blocked because this email already belongs to another user in this instance. Contact your administrator to resolve the account conflict.",
-			),
-		).toBeTruthy();
+		expect(await screen.findByText(ACCOUNT_LINK_REQUIRED_DESCRIPTION)).toBeTruthy();
 	});
 
 	test("shows banned message when SSO returns BANNED_USER code", async () => {

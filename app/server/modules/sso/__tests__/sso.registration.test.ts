@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
+import { and, eq } from "drizzle-orm";
 import { createApp } from "~/server/app";
 import { db } from "~/server/db/db";
 import { account, invitation, member, organization, ssoProvider, usersTable, verification } from "~/server/db/schema";
@@ -6,6 +7,11 @@ import { createTestSession, createTestSessionWithOrgAdmin } from "~/test/helpers
 
 const app = createApp();
 const ssoRegisterUrl = new URL("/api/auth/sso/register", "http://localhost:3000").toString();
+const listUserInvitationsUrl = new URL(
+	"/api/auth/organization/list-user-invitations",
+	"http://localhost:3000",
+).toString();
+const acceptInvitationUrl = new URL("/api/auth/organization/accept-invitation", "http://localhost:3000").toString();
 
 function buildRegisterBody(organizationId: string, suffix: string) {
 	return {
@@ -101,5 +107,71 @@ describe("SSO provider registration authorization", () => {
 
 		const body = await response.json();
 		expect(body.message).toBe("Only organization owners can register SSO providers");
+	});
+});
+
+describe("organization invitation acceptance", () => {
+	beforeEach(async () => {
+		await db.delete(member);
+		await db.delete(account);
+		await db.delete(invitation);
+		await db.delete(ssoProvider);
+		await db.delete(verification);
+		await db.delete(organization);
+		await db.delete(usersTable);
+	});
+
+	test("allows authenticated recipients to list and accept invitations without local email verification", async () => {
+		const inviter = await createTestSession();
+		const recipient = await createTestSession();
+		const invitationId = Bun.randomUUIDv7();
+
+		await db.update(usersTable).set({ emailVerified: false }).where(eq(usersTable.id, recipient.user.id));
+		await db.insert(invitation).values({
+			id: invitationId,
+			organizationId: inviter.organizationId,
+			email: recipient.user.email,
+			role: "member",
+			status: "pending",
+			expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+			createdAt: new Date(),
+			inviterId: inviter.user.id,
+		});
+
+		const listResponse = await app.request(listUserInvitationsUrl, {
+			method: "GET",
+			headers: recipient.headers,
+		});
+
+		expect(listResponse.status).toBe(200);
+		await expect(listResponse.json()).resolves.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					id: invitationId,
+					organizationId: inviter.organizationId,
+				}),
+			]),
+		);
+
+		const acceptResponse = await app.request(acceptInvitationUrl, {
+			method: "POST",
+			headers: {
+				...recipient.headers,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ invitationId }),
+		});
+
+		expect(acceptResponse.status).toBe(200);
+
+		const acceptedInvitation = await db.query.invitation.findFirst({ where: { id: invitationId } });
+		expect(acceptedInvitation?.status).toBe("accepted");
+
+		const memberships = await db
+			.select()
+			.from(member)
+			.where(and(eq(member.userId, recipient.user.id), eq(member.organizationId, inviter.organizationId)))
+			.limit(1);
+		expect(memberships).toHaveLength(1);
 	});
 });

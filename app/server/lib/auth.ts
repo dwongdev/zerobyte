@@ -20,6 +20,7 @@ import { ensureOnlyOneUser } from "./auth/middlewares/only-one-user";
 import { convertLegacyUserOnFirstLogin } from "./auth/middlewares/convert-legacy-user";
 import { ensureDefaultOrg } from "./auth/helpers/create-default-org";
 import { ssoIntegration } from "../modules/sso/sso.integration";
+import { ACCOUNT_LINK_REQUIRED_DESCRIPTION } from "~/lib/sso-errors";
 
 export type AuthMiddlewareContext = MiddlewareContext<MiddlewareOptions, AuthContext<BetterAuthOptions>>;
 
@@ -65,7 +66,7 @@ export const auth = betterAuth({
 						const allowed = await ssoIntegration.canLinkSsoAccount(account.userId, account.providerId);
 						if (!allowed) {
 							throw new APIError("FORBIDDEN", {
-								message: "SSO account linking is not permitted for users outside this organization",
+								message: ACCOUNT_LINK_REQUIRED_DESCRIPTION,
 							});
 						}
 					}
@@ -164,6 +165,7 @@ export const auth = betterAuth({
 		}),
 		organization({
 			allowUserToCreateOrganization: false,
+			requireEmailVerificationOnInvitation: false,
 		}),
 		ssoIntegration.plugin,
 		twoFactor({

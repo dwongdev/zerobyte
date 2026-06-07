@@ -1,4 +1,4 @@
-import type { LoginErrorCode } from "~/lib/sso-errors";
+import { ACCOUNT_LINK_REQUIRED_DESCRIPTION, type LoginErrorCode } from "~/lib/sso-errors";
 
 const INVITE_REQUIRED_ERRORS = new Set([
 	"Access denied. You must be invited to this organization before you can sign in with SSO.",
@@ -10,6 +10,7 @@ const ACCOUNT_LINK_REQUIRED_ERRORS = new Set([
 	"account not linked",
 	"unable to link account",
 	"SSO account linking is not permitted for users outside this organization",
+	ACCOUNT_LINK_REQUIRED_DESCRIPTION,
 ]);
 
 export function mapAuthErrorToCode(error: string): LoginErrorCode {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { ACCOUNT_LINK_REQUIRED_DESCRIPTION } from "~/lib/sso-errors";
 import { mapAuthErrorToCode } from "../sso.errors";
 
 describe("mapAuthErrorToCode", () => {
@@ -18,10 +19,16 @@ describe("mapAuthErrorToCode", () => {
 		).toBe("ACCOUNT_LINK_REQUIRED");
 	});
 
+	test("maps detailed account-linking denial to ACCOUNT_LINK_REQUIRED", () => {
+		expect(mapAuthErrorToCode(encodeURIComponent(ACCOUNT_LINK_REQUIRED_DESCRIPTION))).toBe("ACCOUNT_LINK_REQUIRED");
+	});
+
 	test("maps invite-required errors to INVITE_REQUIRED", () => {
 		expect(
 			mapAuthErrorToCode(
-				encodeURIComponent("Access denied. You must be invited to this organization before you can sign in with SSO."),
+				encodeURIComponent(
+					"Access denied. You must be invited to this organization before you can sign in with SSO.",
+				),
 			),
 		).toBe("INVITE_REQUIRED");
 	});
