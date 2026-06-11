@@ -33,8 +33,8 @@ export const stats = (config: RepositoryConfig, options: { organizationId: strin
 				throw createResticError(res.exitCode, res.stderr);
 			}
 
-			const parsedJson = safeJsonParse<unknown>(res.stdout);
-			const result = resticStatsSchema.safeParse(parsedJson);
+			const lines = res.stdout.split("\n").filter((line) => line.trim());
+			const result = resticStatsSchema.safeParse(safeJsonParse<unknown>(lines.at(-1)));
 
 			if (!result.success) {
 				logger.error(`Restic stats output validation failed: ${result.error.message}`);

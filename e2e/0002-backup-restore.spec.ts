@@ -575,14 +575,19 @@ test("deleting a volume cascades and removes its backup schedule", async ({ page
 	await expect(volumeLink).toBeVisible();
 	await volumeLink.click();
 	await expect(page).toHaveURL(/\/volumes\/[^/?#]+/);
-	await expect(page.getByRole("button", { name: "Actions" })).toBeVisible();
+
+	const actionsButton = page.getByRole("button", { name: "Actions" });
+	await expect(actionsButton).toBeVisible();
+
+	const deleteVolumeMenuItem = page.getByRole("menuitem", { name: "Delete", exact: true });
 	await expect(async () => {
-		await page.getByRole("button", { name: "Actions" }).click();
-		const deleteVolumeMenuItem = page.getByRole("menuitem", { name: "Delete" });
+		if (!(await deleteVolumeMenuItem.isVisible())) {
+			await actionsButton.click();
+		}
 		await expect(deleteVolumeMenuItem).toBeVisible();
-		await deleteVolumeMenuItem.click();
-		await expect(page.getByRole("heading", { name: "Delete volume?" })).toBeVisible();
 	}).toPass({ timeout: 10000 });
+	await deleteVolumeMenuItem.click();
+	await expect(page.getByRole("heading", { name: "Delete volume?" })).toBeVisible({ timeout: 10000 });
 	await expect(
 		page.getByText("All backup schedules associated with this volume will also be removed."),
 	).toBeVisible();
@@ -593,7 +598,9 @@ test("deleting a volume cascades and removes its backup schedule", async ({ page
 	await expect(page.getByText(names.backupName, { exact: true })).toHaveCount(0);
 });
 
-test("backup respects include globs, exclusion patterns, and exclude-if-present", async ({ page }, testInfo) => {
+test("backup applies excludes inside included directories but keeps exact include matches", async ({
+	page,
+}, testInfo) => {
 	const runId = getRunId(testInfo);
 	const names = getScenarioNames(runId);
 	const workerTestDataPath = getWorkerTestDataPath();
@@ -601,13 +608,16 @@ test("backup respects include globs, exclusion patterns, and exclude-if-present"
 	const keptDir = `kept-${runId}`;
 	const secondKeptDir = `second-kept-${runId}`;
 	const blockedDir = `blocked-${runId}`;
+	const nestedBlockedDir = `nested-blocked-${runId}`;
 	const globOnlyDir = `glob-only-${runId}`;
 	const dataDir = `data-${runId}`;
 	const configDir = `config-${runId}`;
 
+	const explicitMarkedFile = `explicit-marker-dir-${runId}.xyz`;
+	const nestedBlockedFile = `blocked-${runId}.xyz`;
 	const dataIncludedFile = `data-${runId}.txt`;
 	const configIncludedFile = `config-${runId}.json`;
-	const configExcludedFile = `secret-${runId}.json`;
+	const configExplicitlyIncludedFile = `secret-${runId}.json`;
 	const configNonJsonFile = `config-${runId}.txt`;
 	const rootDbFile = `root-${runId}.db`;
 	const secondRootDbFile = `archive-${runId}.db`;
@@ -616,6 +626,7 @@ test("backup respects include globs, exclusion patterns, and exclude-if-present"
 	const keptPath = path.join(workerTestDataPath, keptDir);
 	const secondKeptPath = path.join(workerTestDataPath, secondKeptDir);
 	const blockedPath = path.join(workerTestDataPath, blockedDir);
+	const nestedBlockedPath = path.join(blockedPath, nestedBlockedDir);
 	const globOnlyPath = path.join(workerTestDataPath, globOnlyDir);
 	const dataPath = path.join(workerTestDataPath, dataDir);
 	const configPath = path.join(workerTestDataPath, configDir);
@@ -623,6 +634,7 @@ test("backup respects include globs, exclusion patterns, and exclude-if-present"
 	fs.mkdirSync(keptPath, { recursive: true });
 	fs.mkdirSync(secondKeptPath, { recursive: true });
 	fs.mkdirSync(blockedPath, { recursive: true });
+	fs.mkdirSync(nestedBlockedPath, { recursive: true });
 	fs.mkdirSync(globOnlyPath, { recursive: true });
 	fs.mkdirSync(dataPath, { recursive: true });
 	fs.mkdirSync(configPath, { recursive: true });
@@ -635,13 +647,15 @@ test("backup respects include globs, exclusion patterns, and exclude-if-present"
 	fs.writeFileSync(path.join(secondKeptPath, ".DS_Store"), "excluded metadata");
 
 	fs.writeFileSync(path.join(blockedPath, ".nobackup"), "marker");
-	fs.writeFileSync(path.join(blockedPath, "blocked.xyz"), "should be excluded");
+	fs.writeFileSync(path.join(blockedPath, explicitMarkedFile), "explicitly included marker directory content");
+	fs.writeFileSync(path.join(nestedBlockedPath, ".nobackup"), "nested marker");
+	fs.writeFileSync(path.join(nestedBlockedPath, nestedBlockedFile), "nested marker directory content");
 
 	fs.writeFileSync(path.join(globOnlyPath, "glob-only.xyz"), "glob include");
 
 	fs.writeFileSync(path.join(dataPath, dataIncludedFile), "data include");
 	fs.writeFileSync(path.join(configPath, configIncludedFile), "json include");
-	fs.writeFileSync(path.join(configPath, configExcludedFile), "json excluded by absolute exclude");
+	fs.writeFileSync(path.join(configPath, configExplicitlyIncludedFile), "json matched by explicit include glob");
 	fs.writeFileSync(path.join(configPath, configNonJsonFile), "not included by /config/*.json");
 
 	fs.writeFileSync(path.join(workerTestDataPath, rootDbFile), "root db include");
@@ -690,21 +704,29 @@ test("backup respects include globs, exclusion patterns, and exclude-if-present"
 	await expect(page.getByRole("button", { name: new RegExp(configIncludedFile.replace(".", "\\.")) })).toBeVisible({
 		timeout: 15000,
 	});
+	await expect(
+		page.getByRole("button", { name: new RegExp(configExplicitlyIncludedFile.replace(".", "\\.")) }),
+	).toBeVisible({
+		timeout: 15000,
+	});
 	await expect(page.getByRole("button", { name: new RegExp(rootDbFile.replace(".", "\\.")) })).toBeVisible({
 		timeout: 15000,
 	});
 	await expect(page.getByRole("button", { name: new RegExp(secondRootDbFile.replace(".", "\\.")) })).toBeVisible({
 		timeout: 15000,
 	});
+	await expect(page.getByRole("button", { name: new RegExp(explicitMarkedFile.replace(".", "\\.")) })).toBeVisible({
+		timeout: 15000,
+	});
 
 	await expect(page.getByRole("button", { name: /\.DS_Store/ })).toHaveCount(0);
 	await expect(page.getByRole("button", { name: /skip\.tmp/ })).toHaveCount(0);
-	await expect(page.getByRole("button", { name: new RegExp(configExcludedFile.replace(".", "\\.")) })).toHaveCount(0);
 	await expect(page.getByRole("button", { name: new RegExp(configNonJsonFile.replace(".", "\\.")) })).toHaveCount(0);
 	await expect(page.getByRole("button", { name: new RegExp(rootNonDbFile.replace(".", "\\.")) })).toHaveCount(0);
 
 	await expect(page.getByRole("button", { name: /\.nobackup/ })).toBeVisible();
-	await expect(page.getByRole("button", { name: /blocked\.xyz/ })).toHaveCount(0);
+	await expect(page.getByRole("button", { name: nestedBlockedDir, exact: true })).toHaveCount(0);
+	await expect(page.getByRole("button", { name: new RegExp(nestedBlockedFile.replace(".", "\\.")) })).toHaveCount(0);
 });
 
 test("backup can include a selected folder whose name contains brackets", async ({ page }, testInfo) => {
