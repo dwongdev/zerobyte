@@ -30,6 +30,9 @@ const envSchema = z
 		WEBHOOK_ALLOWED_ORIGINS: z.string().optional(),
 		PROVISIONING_PATH: z.string().optional(),
 		RESTIC_COMMAND: z.string().default("restic"),
+		ZEROBYTE_RUNTIME: z.enum(["server", "desktop"]).default("server"),
+		ZEROBYTE_DESKTOP_RESOURCES_DIR: z.string().optional(),
+		ZEROBYTE_DESKTOP_LAUNCH_SECRET: z.string().optional(),
 	})
 	.transform((s, ctx) => {
 		let baseUrl = unquote(s.BASE_URL);
@@ -139,6 +142,11 @@ const envSchema = z
 			provisioningPath: s.PROVISIONING_PATH,
 			allowedHosts,
 			webhookAllowedOrigins,
+			runtime: s.ZEROBYTE_RUNTIME,
+			desktop: {
+				resourcesDir: s.ZEROBYTE_DESKTOP_RESOURCES_DIR,
+				launchSecret: s.ZEROBYTE_DESKTOP_LAUNCH_SECRET,
+			},
 			resticCommand,
 		};
 	});

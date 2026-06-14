@@ -67,6 +67,12 @@ describe("parseConfig", () => {
 			trustProxy: true,
 			appSecret: validAppSecret,
 			baseUrl: "https://example.com",
+			runtime: "server",
+			desktop: {
+				resourcesDir: undefined,
+				launchSecret: undefined,
+			},
+			resticCommand: "restic",
 			isSecure: true,
 			flags: {
 				disableRateLimiting: true,
@@ -76,7 +82,6 @@ describe("parseConfig", () => {
 			provisioningPath: "/tmp/provisioning",
 			allowedHosts: ["example.com", "admin.example.com", "localhost:3000"],
 			webhookAllowedOrigins: [],
-			resticCommand: "restic",
 		});
 	});
 
@@ -88,6 +93,20 @@ describe("parseConfig", () => {
 		);
 
 		expect(config.resticHostname).toBe("manual-restic-host");
+	});
+
+	test("parses desktop runtime values when present", () => {
+		const config = parseConfig(
+			createEnv({
+				ZEROBYTE_RUNTIME: "desktop",
+				ZEROBYTE_DESKTOP_RESOURCES_DIR: "desktop-resources",
+				ZEROBYTE_DESKTOP_LAUNCH_SECRET: "desktop-secret",
+			}),
+		);
+
+		expect(config.runtime).toBe("desktop");
+		expect(config.desktop.resourcesDir).toBe("desktop-resources");
+		expect(config.desktop.launchSecret).toBe("desktop-secret");
 	});
 
 	test("reads APP_SECRET from APP_SECRET_FILE", () => {
