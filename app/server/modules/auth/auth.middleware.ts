@@ -1,12 +1,12 @@
 import { createMiddleware } from "hono/factory";
 import { auth } from "~/server/lib/auth";
 import { db } from "~/server/db/db";
-import { getPermission, withContext } from "~/server/core/request-context";
+import { getPermission, hasFeature, withContext } from "~/server/core/request-context";
 import { getApiKeyOrganizationId } from "../api-keys/api-keys.service";
-import type { Permission } from "~/lib/permission-policy";
+import type { AuthSource, Permission, RuntimeFeature } from "~/lib/permission-policy";
+import { getSessionAuthSource, invalidateAuthSession, isSessionAuthSourceAllowed } from "./helpers";
 
 const API_KEY_HEADER = "x-api-key";
-type AuthSource = "browser-session" | "api-key";
 type AuthenticatedUser = {
 	id: string;
 	email: string;
@@ -31,7 +31,7 @@ declare module "hono" {
  */
 export const requireAuth = createMiddleware(async (c, next) => {
 	const apiKeyValue = c.req.header(API_KEY_HEADER);
-	const authSource: AuthSource = apiKeyValue ? "api-key" : "browser-session";
+	let authSource: AuthSource = apiKeyValue ? "api-key" : "browser-session";
 	let user: AuthenticatedUser | undefined;
 	let activeOrganizationId: string | null | undefined;
 
@@ -53,8 +53,15 @@ export const requireAuth = createMiddleware(async (c, next) => {
 		const sess = await auth.api.getSession({ headers: c.req.raw.headers });
 
 		if (sess) {
+			if (!isSessionAuthSourceAllowed(sess.session.authSource)) {
+				await invalidateAuthSession(sess.session.token, c);
+
+				return c.json<unknown>({ message: "Invalid or expired session" }, 401);
+			}
+
 			user = sess.user;
 			activeOrganizationId = sess.session.activeOrganizationId;
+			authSource = getSessionAuthSource(sess.session.authSource);
 		}
 	}
 
@@ -100,12 +107,29 @@ export const requireAuth = createMiddleware(async (c, next) => {
 });
 
 export const requireBrowserSession = createMiddleware(async (c, next) => {
+	if (c.get("authSource") !== "browser-session") {
+		return c.json({ message: "Browser session required" }, 401);
+	}
+
+	await next();
+});
+
+export const requireUserSession = createMiddleware(async (c, next) => {
 	if (c.get("authSource") === "api-key") {
 		return c.json({ message: "Browser session required" }, 401);
 	}
 
 	await next();
 });
+
+export const requireRuntimeFeature = (feature: RuntimeFeature) =>
+	createMiddleware(async (c, next) => {
+		if (!hasFeature(feature)) {
+			return c.json({ message: "Not available in desktop mode" }, 403);
+		}
+
+		await next();
+	});
 
 export const requirePermission = (permission: Permission) =>
 	createMiddleware(async (c, next) => {
@@ -142,7 +166,7 @@ export const requireOrgAdmin = createMiddleware(async (c, next) => {
 });
 
 export const requireAdmin = createMiddleware(async (c, next) => {
-	if (c.get("authSource") === "api-key") {
+	if (c.get("authSource") !== "browser-session") {
 		return c.json({ message: "Browser session required" }, 401);
 	}
 

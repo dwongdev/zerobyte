@@ -46,6 +46,40 @@ describe("permissions", () => {
 			evaluatePermission("ssoProvider.create", {
 				runtime: "server",
 				orgRole: "owner",
+				authSource: "desktop-session",
+			}),
+		).toEqual({ allowed: false, reason: "authSource" });
+
+		expect(
+			evaluatePermission("ssoProvider.create", {
+				runtime: "server",
+				orgRole: "owner",
+				authSource: "api-key",
+			}),
+		).toEqual({ allowed: false, reason: "authSource" });
+	});
+
+	test("allows recovery-key download for browser and desktop sessions but not API keys", () => {
+		expect(
+			evaluatePermission("recoveryKey.download", {
+				runtime: "desktop",
+				orgRole: "owner",
+				authSource: "desktop-session",
+			}).allowed,
+		).toBe(true);
+
+		expect(
+			evaluatePermission("recoveryKey.download", {
+				runtime: "server",
+				orgRole: "owner",
+				authSource: "browser-session",
+			}).allowed,
+		).toBe(true);
+
+		expect(
+			evaluatePermission("recoveryKey.download", {
+				runtime: "desktop",
+				orgRole: "owner",
 				authSource: "api-key",
 			}),
 		).toEqual({ allowed: false, reason: "authSource" });
@@ -80,5 +114,9 @@ describe("permissions", () => {
 	test("models runtime features independently from user roles", () => {
 		expect(hasRuntimeFeature("server", "remoteVolumeBackends")).toBe(true);
 		expect(hasRuntimeFeature("desktop", "remoteVolumeBackends")).toBe(false);
+		expect(hasRuntimeFeature("server", "apiKeys")).toBe(true);
+		expect(hasRuntimeFeature("desktop", "apiKeys")).toBe(false);
+		expect(hasRuntimeFeature("server", "passwordAuthentication")).toBe(true);
+		expect(hasRuntimeFeature("desktop", "passwordAuthentication")).toBe(false);
 	});
 });

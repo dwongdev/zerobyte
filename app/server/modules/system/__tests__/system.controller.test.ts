@@ -4,7 +4,7 @@ import { createTestSession, createTestSessionWithGlobalAdmin, getAuthHeaders } f
 import { systemService } from "../system.service";
 import * as authHelpers from "~/server/modules/auth/helpers";
 import { db } from "~/server/db/db";
-import { organization, usersTable } from "~/server/db/schema";
+import { organization, sessionsTable, usersTable } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { cryptoUtils } from "~/server/utils/crypto";
 import { config } from "~/server/core/config";
@@ -13,6 +13,15 @@ const app = createApp();
 
 let session: Awaited<ReturnType<typeof createTestSession>>;
 let globalAdminSession: Awaited<ReturnType<typeof createTestSessionWithGlobalAdmin>>;
+
+const createDesktopTestSession = async () => {
+	const desktopAuthSession = await createTestSession();
+	await db
+		.update(sessionsTable)
+		.set({ authSource: "desktop-session" })
+		.where(eq(sessionsTable.token, desktopAuthSession.session.token));
+	return desktopAuthSession;
+};
 
 beforeAll(async () => {
 	session = await createTestSession();
@@ -51,10 +60,11 @@ describe("system security", () => {
 
 	test("returns desktop runtime and effective backend lists in desktop mode", async () => {
 		config.runtime = "desktop";
+		const desktopAuthSession = await createDesktopTestSession();
 
 		try {
 			const res = await app.request("/api/v1/system/info", {
-				headers: session.headers,
+				headers: desktopAuthSession.headers,
 			});
 
 			expect(res.status).toBe(200);
@@ -93,7 +103,9 @@ describe("system security", () => {
 
 	describe("registration-status endpoint", () => {
 		test("GET /api/v1/system/registration-status should be accessible with valid session", async () => {
-			const res = await app.request("/api/v1/system/registration-status", { headers: session.headers });
+			const res = await app.request("/api/v1/system/registration-status", {
+				headers: session.headers,
+			});
 			expect(res.status).toBe(200);
 			const body = await res.json();
 			expect(typeof body.enabled).toBe("boolean");
@@ -185,8 +197,9 @@ describe("system security", () => {
 			expect(await res.text()).toBe(resticPassword);
 		});
 
-		test("should download restic password without password re-authentication in desktop mode", async () => {
+		test("should download restic password without password re-authentication for desktop sessions", async () => {
 			config.runtime = "desktop";
+			const desktopAuthSession = await createDesktopTestSession();
 			const { cryptoUtils: actualCryptoUtils } =
 				await vi.importActual<typeof import("~/server/utils/crypto")>("~/server/utils/crypto");
 			const resticPassword = "desktop-restic-password";
@@ -196,17 +209,17 @@ describe("system security", () => {
 			await db
 				.update(organization)
 				.set({ metadata: { resticPassword: encryptedResticPassword } })
-				.where(eq(organization.id, session.organizationId));
+				.where(eq(organization.id, desktopAuthSession.organizationId));
 			await db
 				.update(usersTable)
 				.set({ hasDownloadedResticPassword: false })
-				.where(eq(usersTable.id, session.user.id));
+				.where(eq(usersTable.id, desktopAuthSession.user.id));
 			vi.spyOn(cryptoUtils, "resolveSecret").mockImplementationOnce(actualCryptoUtils.resolveSecret);
 
 			const res = await app.request("/api/v1/system/restic-password", {
 				method: "POST",
 				headers: {
-					...session.headers,
+					...desktopAuthSession.headers,
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
@@ -218,8 +231,53 @@ describe("system security", () => {
 			expect(await res.text()).toBe(resticPassword);
 			expect(verifyPasswordSpy).not.toHaveBeenCalled();
 
-			const updatedUser = await db.query.usersTable.findFirst({ where: { id: session.user.id } });
+			const updatedUser = await db.query.usersTable.findFirst({
+				where: { id: desktopAuthSession.user.id },
+			});
 			expect(updatedUser?.hasDownloadedResticPassword).toBe(true);
+		});
+
+		test("rejects browser sessions in desktop mode", async () => {
+			config.runtime = "desktop";
+			const browserSession = await createTestSession();
+			const verifyPasswordSpy = vi.spyOn(authHelpers, "verifyUserPassword").mockResolvedValueOnce(false);
+
+			const res = await app.request("/api/v1/system/restic-password", {
+				method: "POST",
+				headers: {
+					...browserSession.headers,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					password: "wrong-password",
+				}),
+			});
+
+			expect(res.status).toBe(401);
+			expect(verifyPasswordSpy).not.toHaveBeenCalled();
+			const body = await res.json();
+			expect(body.message).toBe("Invalid or expired session");
+		});
+
+		test("rejects desktop sessions outside desktop mode", async () => {
+			const desktopAuthSession = await createDesktopTestSession();
+			const verifyPasswordSpy = vi.spyOn(authHelpers, "verifyUserPassword").mockResolvedValueOnce(false);
+
+			const res = await app.request("/api/v1/system/restic-password", {
+				method: "POST",
+				headers: {
+					...desktopAuthSession.headers,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					password: "wrong-password",
+				}),
+			});
+
+			expect(res.status).toBe(401);
+			expect(verifyPasswordSpy).not.toHaveBeenCalled();
+			const body = await res.json();
+			expect(body.message).toBe("Invalid or expired session");
 		});
 
 		test("should return 400 for invalid payload on restic-password", async () => {

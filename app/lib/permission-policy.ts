@@ -1,11 +1,13 @@
 export type Runtime = "server" | "desktop";
-export type AuthSource = "browser-session" | "api-key";
+export type AuthSource = "browser-session" | "desktop-session" | "api-key";
 
 export type RuntimeFeature =
 	| "instanceAdministration"
 	| "organizationAdministration"
 	| "ssoManagement"
-	| "remoteVolumeBackends";
+	| "remoteVolumeBackends"
+	| "apiKeys"
+	| "passwordAuthentication";
 
 export const RUNTIME_FEATURES = {
 	server: {
@@ -13,12 +15,16 @@ export const RUNTIME_FEATURES = {
 		organizationAdministration: true,
 		ssoManagement: true,
 		remoteVolumeBackends: true,
+		apiKeys: true,
+		passwordAuthentication: true,
 	},
 	desktop: {
 		instanceAdministration: false,
 		organizationAdministration: false,
 		ssoManagement: false,
 		remoteVolumeBackends: false,
+		apiKeys: false,
+		passwordAuthentication: false,
 	},
 } as const satisfies Record<Runtime, Record<RuntimeFeature, boolean>>;
 
@@ -65,7 +71,7 @@ const PERMISSIONS = {
 	},
 	"recoveryKey.download": {
 		orgRoles: ["owner", "admin"],
-		authSources: ["browser-session"],
+		authSources: ["browser-session", "desktop-session"],
 	},
 } as const satisfies Record<string, PermissionPolicy>;
 
