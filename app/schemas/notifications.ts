@@ -23,7 +23,7 @@ const notificationHeaderSchema = z.string().refine((header) => {
 
 export const emailNotificationConfigSchema = z.object({
 	type: z.literal("email"),
-	smtpHost: z.string().min(1),
+	smtpHost: z.string().trim().min(1),
 	smtpPort: z.number().int().min(1).max(65535),
 	username: z.string().optional(),
 	password: z.string().optional(),
