@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { parseConfig } from "../config";
 
 const validAppSecret = "a".repeat(32);
+const validDesktopLaunchSecret = "0123456789abcdef0123456789abcdef";
 const fileAppSecret = "b".repeat(32);
 const appSecretFixturePath = fileURLToPath(new URL("./fixtures/app-secret.txt", import.meta.url));
 const shortAppSecretFixturePath = fileURLToPath(new URL("./fixtures/short-app-secret.txt", import.meta.url));
@@ -100,13 +101,31 @@ describe("parseConfig", () => {
 			createEnv({
 				ZEROBYTE_RUNTIME: "desktop",
 				ZEROBYTE_DESKTOP_RESOURCES_DIR: "desktop-resources",
-				ZEROBYTE_DESKTOP_LAUNCH_SECRET: "desktop-secret",
+				ZEROBYTE_DESKTOP_LAUNCH_SECRET: validDesktopLaunchSecret,
 			}),
 		);
 
 		expect(config.runtime).toBe("desktop");
 		expect(config.desktop.resourcesDir).toBe("desktop-resources");
-		expect(config.desktop.launchSecret).toBe("desktop-secret");
+		expect(config.desktop.launchSecret).toBe(validDesktopLaunchSecret);
+	});
+
+	test("exits when ZEROBYTE_DESKTOP_LAUNCH_SECRET is too short", () => {
+		expectParseConfigToExit(
+			createEnv({
+				ZEROBYTE_DESKTOP_LAUNCH_SECRET: "a",
+			}),
+			"ZEROBYTE_DESKTOP_LAUNCH_SECRET must be between 32 and 256 characters long.",
+		);
+	});
+
+	test("exits when ZEROBYTE_DESKTOP_LAUNCH_SECRET is too long", () => {
+		expectParseConfigToExit(
+			createEnv({
+				ZEROBYTE_DESKTOP_LAUNCH_SECRET: "a".repeat(257),
+			}),
+			"ZEROBYTE_DESKTOP_LAUNCH_SECRET must be between 32 and 256 characters long.",
+		);
 	});
 
 	test("reads APP_SECRET from APP_SECRET_FILE", () => {

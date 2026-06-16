@@ -32,7 +32,14 @@ const envSchema = z
 		RESTIC_COMMAND: z.string().default("restic"),
 		ZEROBYTE_RUNTIME: z.enum(["server", "desktop"]).default("server"),
 		ZEROBYTE_DESKTOP_RESOURCES_DIR: z.string().optional(),
-		ZEROBYTE_DESKTOP_LAUNCH_SECRET: z.string().optional(),
+		ZEROBYTE_DESKTOP_LAUNCH_SECRET: z.preprocess(
+			(value) => (value === "" ? undefined : value),
+			z
+				.string()
+				.min(32, "ZEROBYTE_DESKTOP_LAUNCH_SECRET must be between 32 and 256 characters long.")
+				.max(256, "ZEROBYTE_DESKTOP_LAUNCH_SECRET must be between 32 and 256 characters long.")
+				.optional(),
+		),
 	})
 	.transform((s, ctx) => {
 		let baseUrl = unquote(s.BASE_URL);
