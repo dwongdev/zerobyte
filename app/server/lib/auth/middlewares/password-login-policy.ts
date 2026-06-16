@@ -4,8 +4,10 @@ import type { AuthMiddlewareContext } from "~/server/lib/auth";
 import { serverHasRuntimeFeature } from "~/server/lib/permission-service";
 import { systemService } from "~/server/modules/system/system.service";
 
+const PASSWORD_AUTH_PATHS = new Set(["/sign-in/email", "/sign-in/username", "/sign-up/email"]);
+
 export const enforcePasswordLoginPolicy = async (ctx: AuthMiddlewareContext) => {
-	if (ctx.path !== "/sign-in/email" && ctx.path !== "/sign-in/username") {
+	if (!PASSWORD_AUTH_PATHS.has(ctx.path)) {
 		return;
 	}
 

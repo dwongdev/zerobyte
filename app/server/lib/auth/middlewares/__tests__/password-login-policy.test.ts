@@ -26,13 +26,16 @@ describe("enforcePasswordLoginPolicy", () => {
 		await expect(enforcePasswordLoginPolicy(createContext("/sign-in/username"))).resolves.toBeUndefined();
 	});
 
-	test("blocks username and email password sign-in when password login is disabled", async () => {
+	test("blocks password sign-in and sign-up when password login is disabled", async () => {
 		vi.spyOn(systemService, "isPasswordLoginDisabled").mockResolvedValue(true);
 
 		await expect(enforcePasswordLoginPolicy(createContext("/sign-in/username"))).rejects.toThrow(
 			"Password login is disabled",
 		);
 		await expect(enforcePasswordLoginPolicy(createContext("/sign-in/email"))).rejects.toThrow(
+			"Password login is disabled",
+		);
+		await expect(enforcePasswordLoginPolicy(createContext("/sign-up/email"))).rejects.toThrow(
 			"Password login is disabled",
 		);
 	});
