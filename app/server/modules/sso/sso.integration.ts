@@ -170,7 +170,10 @@ async function beforeAcceptInvitation({ invitation }: AcceptInvitationHookData) 
 
 export const ssoIntegration = {
 	plugin: sso({
-		trustEmailVerified: false,
+		// Better Auth's SSO callback only reaches our account-linking hook when the
+		// provider email is trusted. The hook below still enforces org membership or
+		// an explicit invitation intent before any existing account can be linked.
+		trustEmailVerified: true,
 		providersLimit: async (user: User) => {
 			const isOrgAdmin = await authService.isOrgAdminAnywhere(user.id);
 			return isOrgAdmin ? 10 : 0;
