@@ -107,6 +107,16 @@ jobs:
           build-args: |
             APP_VERSION=${{ needs.determine-release-type.outputs.tagname }}
 
+  publish-desktop-testflight:
+    needs: [determine-release-type, checks, e2e-tests, integration-tests]
+    uses: ./.github/workflows/desktop-release.yml
+    permissions:
+      contents: read
+    with:
+      release_tag: ${{ needs.determine-release-type.outputs.tagname }}
+      publish_testflight: true
+    secrets: inherit
+
   publish-release:
     runs-on: ubuntu-latest
     needs: [build-images, determine-release-type]
