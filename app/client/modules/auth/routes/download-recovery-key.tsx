@@ -22,12 +22,14 @@ type Props = {
 	passwordAuthSupported: boolean;
 	hasPassword: boolean;
 	userId: string | null;
+	runtime: "server" | "desktop";
 };
 
-export function DownloadRecoveryKeyPage({ passwordAuthSupported, hasPassword, userId }: Props) {
+export function DownloadRecoveryKeyPage({ passwordAuthSupported, hasPassword, userId, runtime }: Props) {
 	const navigate = useNavigate();
 	const [password, setPassword] = useState("");
 	const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
+	const isDesktopRuntime = runtime === "desktop";
 
 	const downloadResticPassword = useMutation({
 		...downloadResticPasswordMutation(),
@@ -79,6 +81,16 @@ export function DownloadRecoveryKeyPage({ passwordAuthSupported, hasPassword, us
 			title="Download Your Recovery Key"
 			description="This is a critical step to ensure you can recover your backups"
 		>
+			{isDesktopRuntime && (
+				<Alert variant="warning" className="mb-3">
+					<AlertTriangle className="size-5" />
+					<AlertTitle>Zerobyte Alpha</AlertTitle>
+					<AlertDescription>
+						This desktop app is an early Alpha. Expect changes, verify restores, and keep this recovery key
+						somewhere outside the app.
+					</AlertDescription>
+				</Alert>
+			)}
 			<Alert variant="warning" className="mb-6">
 				<AlertTriangle className="size-5" />
 				<AlertTitle>Important: Save This File Securely</AlertTitle>

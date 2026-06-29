@@ -8,6 +8,8 @@ import { saveSecurityScopedBookmark, startAccessingSavedBookmarks } from "./secu
 
 const trayStatusPollMs = 30_000;
 
+app.setName("Zerobyte Alpha");
+
 type BackupScheduleTrayStatus = {
 	lastBackupStatus: "success" | "error" | "in_progress" | "warning" | null;
 };

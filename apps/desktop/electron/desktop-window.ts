@@ -38,13 +38,17 @@ export const createDesktopWindow = async ({ currentWindow, serverUrl, isQuitting
 		height: 840,
 		minWidth: 960,
 		minHeight: 640,
-		title: "Zerobyte",
+		title: "Zerobyte Alpha",
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: false,
 		},
+	});
+
+	window.on("page-title-updated", (event) => {
+		event.preventDefault();
 	});
 
 	window.on("close", (event) => {

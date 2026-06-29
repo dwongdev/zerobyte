@@ -88,7 +88,7 @@ const prepareRuntime = async ({ electronPlatformName, arch }) => {
 /** @type {import("electron-builder").Configuration} */
 const config = {
 	appId: "com.nicotsx.zerobyte",
-	productName: "Zerobyte",
+	productName: "Zerobyte Alpha",
 	extraMetadata: { version: appStoreVersion },
 	asar: true,
 	artifactName: `\${productName}-${releaseTag}-\${os}-\${arch}.\${ext}`,

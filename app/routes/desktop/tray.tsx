@@ -19,6 +19,7 @@ import {
 } from "~/client/api-client/@tanstack/react-query.gen";
 import type { ListBackupSchedulesResponse } from "~/client/api-client/types.gen";
 import { TimeAgo } from "~/client/components/time-ago";
+import { Badge } from "~/client/components/ui/badge";
 import { Button } from "~/client/components/ui/button";
 import { Progress } from "~/client/components/ui/progress";
 import { useFormatBytes } from "~/client/hooks/use-format-bytes";
@@ -235,7 +236,13 @@ function TrayEmptyState() {
 
 function TrayFooter() {
 	return (
-		<footer className="flex justify-end border-t border-border bg-card-header p-3">
+		<footer className="flex items-center justify-between gap-3 border-t border-border bg-card-header p-3">
+			<div className="flex min-w-0 items-center gap-2">
+				<span className="truncate text-xs font-medium">Zerobyte</span>
+				<Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-semibold">
+					Alpha
+				</Badge>
+			</div>
 			<Button
 				variant="secondary"
 				size="icon"

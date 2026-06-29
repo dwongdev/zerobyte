@@ -13,12 +13,14 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from "~/client/components/ui/sidebar";
+import { Badge } from "~/client/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/client/components/ui/tooltip";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "~/client/components/ui/hover-card";
 import { cn } from "~/client/lib/utils";
 import { APP_VERSION, RCLONE_VERSION, RESTIC_VERSION, SHOUTRRR_VERSION } from "~/client/lib/version";
 import { useUpdates } from "~/client/hooks/use-updates";
 import { usePermissions } from "~/client/hooks/use-permissions";
+import { useSystemInfo } from "~/client/hooks/use-system-info";
 import { ReleaseNotesDialog } from "./release-notes-dialog";
 import { OrganizationSwitcher } from "./organization-switcher";
 import { Link } from "@tanstack/react-router";
@@ -54,10 +56,12 @@ const items = [
 export function AppSidebar() {
 	const { state, isMobile, setOpenMobile } = useSidebar();
 	const { updates, hasUpdate } = useUpdates();
+	const { runtime } = useSystemInfo();
 	const permissions = usePermissions();
 	const [showReleaseNotes, setShowReleaseNotes] = useState(false);
 
 	const isCollapsed = state === "collapsed";
+	const isDesktopRuntime = runtime === "desktop";
 	const showInstanceAdmin = permissions.can("instanceAdministration.view");
 
 	const displayVersion = APP_VERSION.startsWith("v") || APP_VERSION === "dev" ? APP_VERSION : `v${APP_VERSION}`;
@@ -82,6 +86,14 @@ export function AppSidebar() {
 					>
 						Zerobyte
 					</span>
+					<Badge
+						variant="secondary"
+						className={cn("h-5 px-1.5 text-[10px] font-semibold", {
+							hidden: !isDesktopRuntime || isCollapsed,
+						})}
+					>
+						Alpha
+					</Badge>
 				</Link>
 			</SidebarHeader>
 			<SidebarContent className="p-2 border-r">
