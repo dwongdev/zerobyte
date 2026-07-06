@@ -20,6 +20,7 @@ type Props = {
 
 export const SFTPForm = ({ form }: Props) => {
 	const skipHostKeyCheck = useWatch({ control: form.control, name: "skipHostKeyCheck" });
+	const unsafeSymlinkTargetsDisabled = Boolean(skipHostKeyCheck);
 
 	return (
 		<>
@@ -134,7 +135,18 @@ export const SFTPForm = ({ form }: Props) => {
 							</FormDescription>
 						</div>
 						<FormControl>
-							<Switch checked={field.value} onCheckedChange={field.onChange} />
+							<Switch
+								checked={field.value}
+								onCheckedChange={(checked) => {
+									field.onChange(checked);
+									if (checked) {
+										form.setValue("allowUnsafeSymlinkTargets", false, {
+											shouldDirty: true,
+											shouldValidate: true,
+										});
+									}
+								}}
+							/>
 						</FormControl>
 					</FormItem>
 				)}
@@ -165,7 +177,7 @@ export const SFTPForm = ({ form }: Props) => {
 			)}
 			<Collapsible>
 				<CollapsibleTrigger>Advanced Settings</CollapsibleTrigger>
-				<CollapsibleContent className="pb-4 pt-4">
+				<CollapsibleContent className="pb-4 pt-4 space-y-4">
 					<FormField
 						control={form.control}
 						name="allowLegacySshRsa"
@@ -181,6 +193,30 @@ export const SFTPForm = ({ form }: Props) => {
 								<FormControl>
 									<Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
 								</FormControl>
+							</FormItem>
+						)}
+					/>
+					<FormField
+						control={form.control}
+						name="allowUnsafeSymlinkTargets"
+						render={({ field }) => (
+							<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+								<div className="space-y-0.5">
+									<FormLabel>Allow absolute and parent-directory symlinks</FormLabel>
+									<FormDescription>
+										Only enable this for trusted SFTP servers with host key verification and known
+										hosts configured. It disables SSHFS symlink containment so Restic can archive
+										symlinks with absolute targets or <code>..</code> path components.
+									</FormDescription>
+								</div>
+								<FormControl>
+									<Switch
+										checked={field.value ?? false}
+										onCheckedChange={field.onChange}
+										disabled={unsafeSymlinkTargetsDisabled}
+									/>
+								</FormControl>
+								<FormMessage />
 							</FormItem>
 						)}
 					/>
