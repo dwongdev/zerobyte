@@ -25,9 +25,6 @@ type SharedServerEventsState = {
 	subscribers: number;
 };
 
-export type RestoreProgressEvent = ServerEventsPayloadMap["restore:progress"];
-export type RestoreCompletedEvent = ServerEventsPayloadMap["restore:completed"];
-
 const sharedState: SharedServerEventsState = {
 	eventSource: null,
 	handlers: {},

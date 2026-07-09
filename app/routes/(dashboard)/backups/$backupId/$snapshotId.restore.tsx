@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getBackupSchedule } from "~/client/api-client";
 import { getRepositoryOptions, getSnapshotDetailsOptions } from "~/client/api-client/@tanstack/react-query.gen";
+import { restoreTasksOptions } from "~/client/modules/repositories/restore-tasks";
 import { RestoreSnapshotPage } from "~/client/modules/repositories/routes/restore-snapshot";
 import { getVolumeMountPath } from "~/client/lib/volume-path";
 import { findCommonAncestor } from "@zerobyte/core/utils";
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/(dashboard)/backups/$backupId/$snapshotId
 			throw new Response("Not Found", { status: 404 });
 		}
 
+		const restoreTaskOptions = restoreTasksOptions(schedule.data.repository.shortId);
 		const [snapshot, repository] = await Promise.all([
 			context.queryClient.ensureQueryData({
 				...getSnapshotDetailsOptions({
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/(dashboard)/backups/$backupId/$snapshotId
 			context.queryClient.ensureQueryData({
 				...getRepositoryOptions({ path: { shortId: schedule.data.repository.shortId } }),
 			}),
+			context.queryClient.ensureQueryData(restoreTaskOptions),
 		]);
 
 		const hasNonPosixSnapshotPaths = snapshot.paths.some((path) => !path.startsWith("/"));

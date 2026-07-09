@@ -3,9 +3,6 @@ import type {
 	ServerBackupProgressEventDto,
 	ServerBackupStartedEventDto,
 	ServerDumpStartedEventDto,
-	ServerRestoreCompletedEventDto,
-	ServerRestoreProgressEventDto,
-	ServerRestoreStartedEventDto,
 } from "~/schemas/events-dto";
 import type { TaskKind, TaskResourceType, TaskStatus } from "~/schemas/tasks";
 
@@ -24,9 +21,6 @@ export const serverEventPayloads = {
 	"backup:started": payload<ServerBackupStartedEventDto>(),
 	"backup:progress": payload<ServerBackupProgressEventDto>(),
 	"backup:completed": payload<ServerBackupCompletedEventDto>(),
-	"restore:started": payload<ServerRestoreStartedEventDto>(),
-	"restore:progress": payload<ServerRestoreProgressEventDto>(),
-	"restore:completed": payload<ServerRestoreCompletedEventDto>(),
 	"dump:started": payload<ServerDumpStartedEventDto>(),
 	"mirror:started": payload<{
 		organizationId: string;

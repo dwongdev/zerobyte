@@ -72,21 +72,11 @@ const assertAllowedControllerLocalRestoreTarget = (target: string) => {
 const isRestoreTask = (task: ParsedTask): task is RestoreTask =>
 	task.kind === "restore" && task.input.kind === "restore";
 
-const asRestoreTask = (task: ParsedTask, restoreId: string, eventName: string) => {
-	if (!isRestoreTask(task)) {
-		logger.warn(`Received ${eventName} for non-restore task ${restoreId}`);
-		return null;
-	}
-
-	return task;
-};
-
-const updateActiveRestoreTask = (restoreId: string, eventName: string, update: () => ParsedTask) => {
+const updateActiveRestoreTask = (restoreId: string, eventName: string, update: () => void) => {
 	try {
-		return asRestoreTask(update(), restoreId, eventName);
+		update();
 	} catch (error) {
 		logger.warn(`Received ${eventName} for inactive restore ${restoreId}: ${toMessage(error)}`);
-		return null;
 	}
 };
 
@@ -125,89 +115,31 @@ const findActiveDoctorTask = (organizationId: string, repositoryShortId: string)
 	});
 };
 
-const emitRestoreStarted = (task: RestoreTask) => {
-	serverEvents.emit("restore:started", {
-		restoreId: task.id,
-		organizationId: task.organizationId,
-		repositoryId: task.input.repositoryId,
-		snapshotId: task.input.snapshotId,
-	});
-};
-
-const emitRestoreProgress = (task: RestoreTask, progress: RestoreExecutionProgress) => {
-	serverEvents.emit("restore:progress", {
-		restoreId: task.id,
-		organizationId: task.organizationId,
-		repositoryId: task.input.repositoryId,
-		snapshotId: task.input.snapshotId,
-		...progress,
-	});
-};
-
-const emitRestoreCompleted = (
-	task: RestoreTask,
-	payload: {
-		status: "success" | "error" | "cancelled";
-		error?: string;
-		filesRestored?: number;
-		filesSkipped?: number;
-	},
-) => {
-	serverEvents.emit("restore:completed", {
-		restoreId: task.id,
-		organizationId: task.organizationId,
-		repositoryId: task.input.repositoryId,
-		snapshotId: task.input.snapshotId,
-		...payload,
-	});
-};
-
 const markRestoreStarted = (restoreId: string) => {
-	const task = updateActiveRestoreTask(restoreId, "restore.started", () => taskStore.markRunning(restoreId));
-	if (!task) return;
-
-	emitRestoreStarted(task);
+	updateActiveRestoreTask(restoreId, "restore.started", () => taskStore.markRunning(restoreId));
 };
 
 const updateRestoreProgress = (restoreId: string, progress: RestoreExecutionProgress) => {
-	const task = updateActiveRestoreTask(restoreId, "restore.progress", () =>
+	updateActiveRestoreTask(restoreId, "restore.progress", () =>
 		taskStore.updateProgress(restoreId, { kind: "restore", progress }),
 	);
-	if (!task) return;
-
-	emitRestoreProgress(task, progress);
 };
 
 const completeRestoreTask = (
 	restoreId: string,
 	result: Extract<RestoreExecutionResult, { status: "completed" }>["result"],
 ) => {
-	const task = updateActiveRestoreTask(restoreId, "restore.completed", () =>
+	updateActiveRestoreTask(restoreId, "restore.completed", () =>
 		taskStore.complete(restoreId, { kind: "restore", result }),
 	);
-	if (!task) return;
-
-	emitRestoreCompleted(task, {
-		status: "success",
-		filesRestored: result.files_restored,
-		filesSkipped: result.files_skipped,
-	});
 };
 
 const failRestoreTask = (restoreId: string, error: string) => {
-	const task = updateActiveRestoreTask(restoreId, "restore.failed", () => taskStore.fail(restoreId, error));
-	if (!task) return;
-
-	emitRestoreCompleted(task, { status: "error", error });
+	updateActiveRestoreTask(restoreId, "restore.failed", () => taskStore.fail(restoreId, error));
 };
 
 const cancelRestoreTask = (restoreId: string, message?: string) => {
-	const task = updateActiveRestoreTask(restoreId, "restore.cancelled", () =>
-		taskStore.cancel(restoreId, message ?? null),
-	);
-	if (!task) return;
-
-	emitRestoreCompleted(task, { status: "cancelled", error: task.cancellationRequested ? undefined : message });
+	updateActiveRestoreTask(restoreId, "restore.cancelled", () => taskStore.cancel(restoreId, message ?? null));
 };
 
 const finishRestoreExecution = async (restoreId: string, resultPromise: Promise<RestoreExecutionResult>) => {

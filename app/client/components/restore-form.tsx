@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, ChevronDown, Download, FolderOpen, RotateCcw } from "lucide-react";
 import { Button } from "~/client/components/ui/button";
@@ -21,7 +21,7 @@ import { FolderSelector } from "~/client/components/folder-selector";
 import { SnapshotTreeBrowser } from "~/client/components/file-browsers/snapshot-tree-browser";
 import { RestoreProgress } from "~/client/components/restore-progress";
 import { restoreSnapshotMutation } from "~/client/api-client/@tanstack/react-query.gen";
-import { type RestoreCompletedEvent, useServerEvents } from "~/client/hooks/use-server-events";
+import { useRestoreTask } from "~/client/modules/repositories/restore-tasks";
 import { OVERWRITE_MODES, type OverwriteMode } from "@zerobyte/core/restic";
 import { isPathWithin } from "@zerobyte/core/utils";
 import type { Repository } from "~/client/lib/types";
@@ -49,7 +49,6 @@ export function RestoreForm({
 	hasNonPosixSnapshotPaths = false,
 }: RestoreFormProps) {
 	const navigate = useNavigate();
-	const { addEventListener } = useServerEvents();
 
 	const snapshotBasePath = queryBasePath ?? "/";
 	const hasMismatchedDisplayBasePath = displayBasePath && !isPathWithin(displayBasePath, snapshotBasePath);
@@ -62,10 +61,6 @@ export function RestoreForm({
 	const [overwriteMode, setOverwriteMode] = useState<OverwriteMode>("always");
 	const [showAdvanced, setShowAdvanced] = useState(false);
 	const [excludeXattr, setExcludeXattr] = useState("");
-	const [isRestoreActive, setIsRestoreActive] = useState(false);
-	const [restoreResult, setRestoreResult] = useState<RestoreCompletedEvent | null>(null);
-	const [showRestoreResultAlert, setShowRestoreResultAlert] = useState(false);
-	const restoreCompletedRef = useRef(false);
 
 	const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
 	const [selectedPathKind, setSelectedPathKind] = useState<"file" | "dir" | null>(null);
@@ -79,62 +74,24 @@ export function RestoreForm({
 		}
 	}, [restoreRequiresCustomTarget]);
 
-	useEffect(() => {
-		const abortController = new AbortController();
-		const signal = abortController.signal;
-
-		addEventListener(
-			"restore:started",
-			(startedData) => {
-				if (startedData.repositoryId === repository.shortId && startedData.snapshotId === snapshotId) {
-					restoreCompletedRef.current = false;
-					setIsRestoreActive(true);
-					setRestoreResult(null);
-					setShowRestoreResultAlert(false);
-				}
-			},
-			{ signal },
-		);
-
-		addEventListener(
-			"restore:progress",
-			(progressData) => {
-				if (progressData.repositoryId === repository.shortId && progressData.snapshotId === snapshotId) {
-					if (restoreCompletedRef.current) {
-						return;
-					}
-					setIsRestoreActive(true);
-				}
-			},
-			{ signal },
-		);
-
-		addEventListener(
-			"restore:completed",
-			(completedData) => {
-				if (completedData.repositoryId === repository.shortId && completedData.snapshotId === snapshotId) {
-					restoreCompletedRef.current = true;
-					setIsRestoreActive(false);
-					setRestoreResult(completedData);
-					setShowRestoreResultAlert(true);
-				}
-			},
-			{ signal },
-		);
-
-		return () => {
-			abortController.abort();
-		};
-	}, [addEventListener, repository.shortId, snapshotId]);
-
-	const { mutate: restoreSnapshot, isPending: isRestoring } = useMutation({
+	const {
+		data: restoreStart,
+		mutate: restoreSnapshot,
+		isPending: isRestoring,
+		reset: resetRestoreMutation,
+	} = useMutation({
 		...restoreSnapshotMutation(),
 		onError: (error) => {
-			restoreCompletedRef.current = true;
-			setIsRestoreActive(false);
 			handleRepositoryError("Restore failed", error, repository.shortId);
 		},
 	});
+
+	const {
+		restoreProgress,
+		finishedRestoreTask,
+		clearFinishedRestoreTask,
+		isRestoreRunning: isRestoreTaskRunning,
+	} = useRestoreTask(repository.shortId, snapshotId, restoreStart?.restoreId);
 
 	const handleRestore = useCallback(() => {
 		const excludeXattrValues = excludeXattr
@@ -147,10 +104,8 @@ export function RestoreForm({
 
 		const includePaths = Array.from(selectedPaths);
 
-		restoreCompletedRef.current = false;
-		setIsRestoreActive(true);
-		setRestoreResult(null);
-		setShowRestoreResultAlert(false);
+		clearFinishedRestoreTask();
+		resetRestoreMutation();
 
 		restoreSnapshot({
 			path: { shortId: repository.shortId },
@@ -173,6 +128,8 @@ export function RestoreForm({
 		selectedPaths,
 		selectedPathKind,
 		overwriteMode,
+		clearFinishedRestoreTask,
+		resetRestoreMutation,
 		restoreSnapshot,
 	]);
 
@@ -196,21 +153,15 @@ export function RestoreForm({
 	}, [repository.shortId, snapshotId, selectedPathKind, selectedPaths]);
 
 	const acknowledgeRestoreResult = useCallback(() => {
-		setShowRestoreResultAlert(false);
-		setRestoreResult(null);
-	}, []);
-
-	const handleResultAlertOpenChange = useCallback((open: boolean) => {
-		if (open) {
-			setShowRestoreResultAlert(true);
-		}
-	}, []);
+		clearFinishedRestoreTask();
+		resetRestoreMutation();
+	}, [clearFinishedRestoreTask, resetRestoreMutation]);
 
 	const canRestore = restoreRequiresCustomTarget
 		? hasCustomTargetPath
 		: restoreLocation === "original" || hasCustomTargetPath;
 	const canDownload = selectedPathCount <= 1;
-	const isRestoreRunning = isRestoring || isRestoreActive;
+	const isRestoreRunning = isRestoring || isRestoreTaskRunning;
 
 	function getDownloadButtonText(): string {
 		if (selectedPathCount > 0) {
@@ -267,7 +218,7 @@ export function RestoreForm({
 
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 				<div className="space-y-6">
-					{isRestoreRunning && <RestoreProgress repositoryId={repository.shortId} snapshotId={snapshotId} />}
+					{isRestoreRunning && <RestoreProgress progress={restoreProgress} />}
 
 					{restoreRequiresCustomTarget && (
 						<Alert variant="warning">
@@ -415,16 +366,16 @@ export function RestoreForm({
 				</Card>
 			</div>
 
-			<AlertDialog open={showRestoreResultAlert} onOpenChange={handleResultAlertOpenChange}>
+			<AlertDialog open={finishedRestoreTask !== null}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>
-							{restoreResult?.status === "success" ? "Restore completed" : "Restore failed"}
+							{finishedRestoreTask?.status === "succeeded" ? "Restore completed" : "Restore failed"}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
-							{restoreResult?.status === "success"
+							{finishedRestoreTask?.status === "succeeded"
 								? `Snapshot ${snapshotId} was restored successfully.`
-								: restoreResult?.error || `Snapshot ${snapshotId} could not be restored.`}
+								: finishedRestoreTask?.error || `Snapshot ${snapshotId} could not be restored.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

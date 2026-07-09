@@ -1,48 +1,20 @@
-import { useEffect, useState } from "react";
+import type { ListTasksResponse } from "~/client/api-client";
 import { ByteSize } from "~/client/components/bytes-size";
 import { useFormatBytes } from "~/client/hooks/use-format-bytes";
 import { useRootLoaderData } from "~/client/hooks/use-root-loader-data";
 import { Card } from "~/client/components/ui/card";
 import { Progress } from "~/client/components/ui/progress";
-import { type RestoreProgressEvent, useServerEvents } from "~/client/hooks/use-server-events";
 import { formatDuration } from "~/utils/utils";
 
+type RestoreTaskProgress = Extract<NonNullable<ListTasksResponse[number]["progress"]>, { kind: "restore" }>["progress"];
+
 type Props = {
-	repositoryId: string;
-	snapshotId: string;
+	progress: RestoreTaskProgress | null;
 };
 
-export const RestoreProgress = ({ repositoryId, snapshotId }: Props) => {
+export const RestoreProgress = ({ progress }: Props) => {
 	const formatBytes = useFormatBytes();
 	const { locale } = useRootLoaderData();
-	const { addEventListener } = useServerEvents();
-	const [progress, setProgress] = useState<RestoreProgressEvent | null>(null);
-
-	useEffect(() => {
-		const abortController = new AbortController();
-
-		addEventListener(
-			"restore:progress",
-			(progressData) => {
-				if (progressData.repositoryId === repositoryId && progressData.snapshotId === snapshotId) {
-					setProgress(progressData);
-				}
-			},
-			{ signal: abortController.signal },
-		);
-
-		addEventListener(
-			"restore:completed",
-			(completedData) => {
-				if (completedData.repositoryId === repositoryId && completedData.snapshotId === snapshotId) {
-					setProgress(null);
-				}
-			},
-			{ signal: abortController.signal },
-		);
-
-		return () => abortController.abort();
-	}, [addEventListener, repositoryId, snapshotId]);
 
 	if (!progress) {
 		return (
@@ -55,8 +27,13 @@ export const RestoreProgress = ({ repositoryId, snapshotId }: Props) => {
 		);
 	}
 
-	const percentDone = Math.round(progress.percent_done * 100);
-	const speed = progress.seconds_elapsed > 0 ? formatBytes(progress.bytes_restored / progress.seconds_elapsed) : null;
+	const secondsElapsed = progress.seconds_elapsed ?? 0;
+	const percentDone = Math.round((progress.percent_done ?? 0) * 100);
+	const totalFiles = progress.total_files ?? 0;
+	const filesRestored = progress.files_restored ?? 0;
+	const totalBytes = progress.total_bytes ?? 0;
+	const bytesRestored = progress.bytes_restored ?? 0;
+	const speed = secondsElapsed > 0 ? formatBytes(bytesRestored / secondsElapsed) : null;
 
 	return (
 		<Card className="p-4">
@@ -74,22 +51,22 @@ export const RestoreProgress = ({ repositoryId, snapshotId }: Props) => {
 				<div>
 					<p className="text-xs uppercase text-muted-foreground">Files</p>
 					<p className="font-medium">
-						{progress.files_restored.toLocaleString(locale)}
+						{filesRestored.toLocaleString(locale)}
 						&nbsp;/&nbsp;
-						{progress.total_files.toLocaleString(locale)}
+						{totalFiles.toLocaleString(locale)}
 					</p>
 				</div>
 				<div>
 					<p className="text-xs uppercase text-muted-foreground">Data</p>
 					<p className="font-medium">
-						<ByteSize bytes={progress.bytes_restored} base={1024} />
+						<ByteSize bytes={bytesRestored} base={1024} />
 						&nbsp;/&nbsp;
-						<ByteSize bytes={progress.total_bytes} base={1024} />
+						<ByteSize bytes={totalBytes} base={1024} />
 					</p>
 				</div>
 				<div>
 					<p className="text-xs uppercase text-muted-foreground">Elapsed</p>
-					<p className="font-medium">{formatDuration(progress.seconds_elapsed)}</p>
+					<p className="font-medium">{formatDuration(secondsElapsed)}</p>
 				</div>
 				<div>
 					<p className="text-xs uppercase text-muted-foreground">Speed</p>

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getBackupSchedule } from "~/client/api-client";
 import { getRepositoryOptions, getSnapshotDetailsOptions } from "~/client/api-client/@tanstack/react-query.gen";
+import { restoreTasksOptions } from "~/client/modules/repositories/restore-tasks";
 import { RestoreSnapshotPage } from "~/client/modules/repositories/routes/restore-snapshot";
 import { getVolumeMountPath } from "~/client/lib/volume-path";
 import { findCommonAncestor } from "@zerobyte/core/utils";
@@ -9,11 +10,15 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/$s
 	component: RouteComponent,
 	errorComponent: (e) => <div>{e.error.message}</div>,
 	loader: async ({ params, context }) => {
+		const restoreTaskOptions = restoreTasksOptions(params.repositoryId);
 		const [snapshot, repository] = await Promise.all([
 			context.queryClient.ensureQueryData({
 				...getSnapshotDetailsOptions({ path: { shortId: params.repositoryId, snapshotId: params.snapshotId } }),
 			}),
-			context.queryClient.ensureQueryData({ ...getRepositoryOptions({ path: { shortId: params.repositoryId } }) }),
+			context.queryClient.ensureQueryData({
+				...getRepositoryOptions({ path: { shortId: params.repositoryId } }),
+			}),
+			context.queryClient.ensureQueryData(restoreTaskOptions),
 		]);
 
 		let displayBasePath: string | undefined;
@@ -38,8 +43,14 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/$s
 	staticData: {
 		breadcrumb: (match) => [
 			{ label: "Repositories", href: "/repositories" },
-			{ label: match.loaderData?.repository?.name || "Repository", href: `/repositories/${match.params.repositoryId}` },
-			{ label: match.params.snapshotId, href: `/repositories/${match.params.repositoryId}/${match.params.snapshotId}` },
+			{
+				label: match.loaderData?.repository?.name || "Repository",
+				href: `/repositories/${match.params.repositoryId}`,
+			},
+			{
+				label: match.params.snapshotId,
+				href: `/repositories/${match.params.repositoryId}/${match.params.snapshotId}`,
+			},
 			{ label: "Restore" },
 		],
 	},
