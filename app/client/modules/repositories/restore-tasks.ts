@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import type { ListTasksResponse } from "~/client/api-client";
 import {
 	isTaskActive,
 	taskEventsOptions,
@@ -8,7 +9,7 @@ import {
 } from "~/client/hooks/use-active-tasks";
 import { useTask } from "~/client/hooks/use-task";
 
-type RestoreTask = TaskOfKind<"restore">;
+export type RestoreTask = TaskOfKind<"restore">;
 
 const restoreTasksFilter = (repositoryId: string, snapshotId: string) => {
 	return {
@@ -23,10 +24,25 @@ export const restoreTasksOptions = (repositoryId: string, snapshotId: string) =>
 	return taskEventsOptions(restoreTasksFilter(repositoryId, snapshotId));
 };
 
-export const useRestoreTask = (repositoryId: string, snapshotId: string, startedTaskId?: string) => {
+export const getActiveRestoreTask = (tasks: ListTasksResponse): RestoreTask | null => {
+	const task = tasks[0];
+	if (!task || task.kind !== "restore" || task.input.kind !== "restore") {
+		return null;
+	}
+
+	return task as RestoreTask;
+};
+
+export const useRestoreTask = (
+	repositoryId: string,
+	snapshotId: string,
+	startedTaskId?: string,
+	initialActiveTask?: RestoreTask | null,
+) => {
 	const [retainedFinishedTask, setRetainedFinishedTask] = useState<RestoreTask | null>(null);
 	const filter = restoreTasksFilter(repositoryId, snapshotId);
 	const { data: activeRestoreTasks } = useActiveTasks(filter, {
+		initialTasks: initialActiveTask ? [initialActiveTask] : undefined,
 		onTaskFinished: setRetainedFinishedTask,
 	});
 	const { task: exactStartedTask } = useTask<RestoreTask>(startedTaskId);

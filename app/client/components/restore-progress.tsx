@@ -28,11 +28,14 @@ export const RestoreProgress = ({ progress }: Props) => {
 	}
 
 	const secondsElapsed = progress.seconds_elapsed ?? 0;
-	const percentDone = Math.round((progress.percent_done ?? 0) * 100);
 	const totalFiles = progress.total_files ?? 0;
 	const filesRestored = progress.files_restored ?? 0;
 	const totalBytes = progress.total_bytes ?? 0;
 	const bytesRestored = progress.bytes_restored ?? 0;
+	const fileProgress = totalFiles > 0 ? filesRestored / totalFiles : 0;
+	const reportedProgress = progress.percent_done ?? 0;
+	const progressFraction = reportedProgress > 0 ? reportedProgress : fileProgress;
+	const percentDone = Math.round(Math.min(progressFraction, 1) * 100);
 	const speed = secondsElapsed > 0 ? formatBytes(bytesRestored / secondsElapsed) : null;
 
 	return (

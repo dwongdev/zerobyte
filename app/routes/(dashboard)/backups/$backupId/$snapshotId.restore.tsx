@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getBackupSchedule } from "~/client/api-client";
 import { getRepositoryOptions, getSnapshotDetailsOptions } from "~/client/api-client/@tanstack/react-query.gen";
-import { restoreTasksOptions } from "~/client/modules/repositories/restore-tasks";
+import { getActiveRestoreTask, restoreTasksOptions } from "~/client/modules/repositories/restore-tasks";
 import { RestoreSnapshotPage } from "~/client/modules/repositories/routes/restore-snapshot";
 import { getVolumeMountPath } from "~/client/lib/volume-path";
 import { findCommonAncestor } from "@zerobyte/core/utils";
@@ -17,10 +17,13 @@ export const Route = createFileRoute("/(dashboard)/backups/$backupId/$snapshotId
 		}
 
 		const restoreTaskOptions = restoreTasksOptions(schedule.data.repository.shortId, params.snapshotId);
-		const [snapshot, repository] = await Promise.all([
+		const [snapshot, repository, activeRestoreTasks] = await Promise.all([
 			context.queryClient.ensureQueryData({
 				...getSnapshotDetailsOptions({
-					path: { shortId: schedule.data.repository.shortId, snapshotId: params.snapshotId },
+					path: {
+						shortId: schedule.data.repository.shortId,
+						snapshotId: params.snapshotId,
+					},
 				}),
 			}),
 			context.queryClient.ensureQueryData({
@@ -38,6 +41,7 @@ export const Route = createFileRoute("/(dashboard)/backups/$backupId/$snapshotId
 			queryBasePath: hasNonPosixSnapshotPaths ? "/" : findCommonAncestor(snapshot.paths),
 			displayBasePath: getVolumeMountPath(schedule.data.volume),
 			hasNonPosixSnapshotPaths,
+			initialActiveTask: getActiveRestoreTask(activeRestoreTasks),
 		};
 	},
 	head: ({ params }) => ({
@@ -52,7 +56,10 @@ export const Route = createFileRoute("/(dashboard)/backups/$backupId/$snapshotId
 	staticData: {
 		breadcrumb: (match) => [
 			{ label: "Backup Jobs", href: "/backups" },
-			{ label: match.loaderData?.schedule?.name || "Job", href: `/backups/${match.params.backupId}` },
+			{
+				label: match.loaderData?.schedule?.name || "Job",
+				href: `/backups/${match.params.backupId}`,
+			},
 			{ label: match.params.snapshotId },
 			{ label: "Restore" },
 		],
@@ -61,7 +68,8 @@ export const Route = createFileRoute("/(dashboard)/backups/$backupId/$snapshotId
 
 function RouteComponent() {
 	const { backupId, snapshotId } = Route.useParams();
-	const { repository, queryBasePath, displayBasePath, hasNonPosixSnapshotPaths } = Route.useLoaderData();
+	const { repository, queryBasePath, displayBasePath, hasNonPosixSnapshotPaths, initialActiveTask } =
+		Route.useLoaderData();
 
 	return (
 		<RestoreSnapshotPage
@@ -71,6 +79,7 @@ function RouteComponent() {
 			queryBasePath={queryBasePath}
 			displayBasePath={displayBasePath}
 			hasNonPosixSnapshotPaths={hasNonPosixSnapshotPaths}
+			initialActiveTask={initialActiveTask}
 		/>
 	);
 }

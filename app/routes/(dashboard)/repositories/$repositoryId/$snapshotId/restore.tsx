@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getBackupSchedule } from "~/client/api-client";
 import { getRepositoryOptions, getSnapshotDetailsOptions } from "~/client/api-client/@tanstack/react-query.gen";
-import { restoreTasksOptions } from "~/client/modules/repositories/restore-tasks";
+import { getActiveRestoreTask, restoreTasksOptions } from "~/client/modules/repositories/restore-tasks";
 import { RestoreSnapshotPage } from "~/client/modules/repositories/routes/restore-snapshot";
 import { getVolumeMountPath } from "~/client/lib/volume-path";
 import { findCommonAncestor } from "@zerobyte/core/utils";
@@ -11,9 +11,11 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/$s
 	errorComponent: (e) => <div>{e.error.message}</div>,
 	loader: async ({ params, context }) => {
 		const restoreTaskOptions = restoreTasksOptions(params.repositoryId, params.snapshotId);
-		const [snapshot, repository] = await Promise.all([
+		const [snapshot, repository, activeRestoreTasks] = await Promise.all([
 			context.queryClient.ensureQueryData({
-				...getSnapshotDetailsOptions({ path: { shortId: params.repositoryId, snapshotId: params.snapshotId } }),
+				...getSnapshotDetailsOptions({
+					path: { shortId: params.repositoryId, snapshotId: params.snapshotId },
+				}),
 			}),
 			context.queryClient.ensureQueryData({
 				...getRepositoryOptions({ path: { shortId: params.repositoryId } }),
@@ -38,6 +40,7 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/$s
 			queryBasePath: hasNonPosixSnapshotPaths ? "/" : findCommonAncestor(snapshot.paths),
 			displayBasePath,
 			hasNonPosixSnapshotPaths,
+			initialActiveTask: getActiveRestoreTask(activeRestoreTasks),
 		};
 	},
 	staticData: {
@@ -67,7 +70,8 @@ export const Route = createFileRoute("/(dashboard)/repositories/$repositoryId/$s
 
 function RouteComponent() {
 	const { repositoryId, snapshotId } = Route.useParams();
-	const { repository, queryBasePath, displayBasePath, hasNonPosixSnapshotPaths } = Route.useLoaderData();
+	const { repository, queryBasePath, displayBasePath, hasNonPosixSnapshotPaths, initialActiveTask } =
+		Route.useLoaderData();
 
 	return (
 		<RestoreSnapshotPage
@@ -77,6 +81,7 @@ function RouteComponent() {
 			queryBasePath={queryBasePath}
 			displayBasePath={displayBasePath}
 			hasNonPosixSnapshotPaths={hasNonPosixSnapshotPaths}
+			initialActiveTask={initialActiveTask}
 		/>
 	);
 }

@@ -17,6 +17,7 @@ export type TaskOfKind<K extends TaskKind> = TaskDto & {
 type TaskForQuery<Q extends TaskEventsQuery> = Q extends { kind: infer K extends TaskKind } ? TaskOfKind<K> : TaskDto;
 
 type UseActiveTasksOptions<Q extends TaskEventsQuery> = {
+	initialTasks?: TaskForQuery<Q>[];
 	onTaskFinished?: (task: TaskForQuery<Q>) => void;
 };
 
@@ -101,7 +102,11 @@ export const useActiveTasks = <const Q extends TaskEventsQuery>(query: Q, option
 	const taskQueryKeyRef = useRef(taskListOptions.queryKey);
 	taskQueryKeyRef.current = taskListOptions.queryKey;
 
-	const tasks = useQuery({ ...taskListOptions, enabled: false });
+	const tasks = useQuery({
+		...taskListOptions,
+		enabled: false,
+		initialData: options.initialTasks,
+	});
 
 	useEffect(() => {
 		const finishTask = (task: TaskDto) => {
