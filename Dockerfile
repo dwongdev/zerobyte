@@ -17,6 +17,8 @@ RUN apk add --no-cache \
 	cifs-utils=7.3-r0 \
 	davfs2=1.6.1-r2 \
 	fuse3=3.16.2-r1 \
+	libcrypto3=3.5.7-r0 \
+	libssl3=3.5.7-r0 \
 	openssh-client-default=10.0_p1-r10 \
 	sshfs=3.7.6-r0 \
 	tini=0.19.0-r3 \
