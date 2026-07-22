@@ -8,7 +8,7 @@ import { rateLimiter } from "hono-rate-limiter";
 import { openAPIRouteHandler } from "hono-openapi";
 import { authController } from "./modules/auth/auth.controller";
 import { ssoController } from "./modules/sso/sso.controller";
-import { requireAuth } from "./modules/auth/auth.middleware";
+import { conditionalRequireAuth } from "./modules/auth/auth.middleware";
 import { repositoriesController } from "./modules/repositories/repositories.controller";
 import { systemController } from "./modules/system/system.controller";
 import { volumeController } from "./modules/volumes/volume.controller";
@@ -124,8 +124,8 @@ export const createApp = () => {
 
 		return auth.handler(c.req.raw);
 	});
-	app.get("/api/v1/openapi.json", generalDescriptor(app));
-	app.get("/api/v1/docs", requireAuth, scalarDescriptor);
+	app.get("/api/v1/openapi.json", conditionalRequireAuth(config.__prod__), generalDescriptor(app));
+	app.get("/api/v1/docs", conditionalRequireAuth(config.__prod__), scalarDescriptor);
 
 	app.onError((err, c) => {
 		const { status, message, details } = handleServiceError(err);

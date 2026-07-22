@@ -25,6 +25,15 @@ declare module "hono" {
 	}
 }
 
+export const conditionalRequireAuth = (shouldRequireAuth: boolean) =>
+	createMiddleware(async (c, next) => {
+		if (shouldRequireAuth) {
+			await requireAuth(c, next);
+		}
+
+		await next();
+	});
+
 /**
  * Middleware to require authentication
  * Verifies the session cookie and attaches user to context
