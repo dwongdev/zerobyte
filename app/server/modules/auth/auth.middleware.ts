@@ -28,7 +28,7 @@ declare module "hono" {
 export const conditionalRequireAuth = (shouldRequireAuth: boolean) =>
 	createMiddleware(async (c, next) => {
 		if (shouldRequireAuth) {
-			await requireAuth(c, next);
+			return requireAuth(c, next);
 		}
 
 		await next();
