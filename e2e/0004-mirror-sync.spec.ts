@@ -14,7 +14,9 @@ type RepositorySummary = {
 
 type MirrorAssignmentSummary = {
 	repositoryId: string;
-	lastCopyStatus: "success" | "error" | "in_progress" | null;
+	lastSyncTask: {
+		status: "cancelled" | "succeeded" | "failed" | "stale";
+	} | null;
 };
 
 type MirrorSyncStatus = {
@@ -106,7 +108,7 @@ async function waitForMirrorSyncComplete(page: Page, backupShortId: string, mirr
 		expect(mirrorsResponse.ok()).toBe(true);
 		const mirrors = (await mirrorsResponse.json()) as MirrorAssignmentSummary[];
 		const mirror = mirrors.find((entry) => entry.repositoryId === mirrorRepoShortId);
-		expect(mirror?.lastCopyStatus).toBe("success");
+		expect(mirror?.lastSyncTask?.status).toBe("succeeded");
 
 		const statusResponse = await page.request.get(
 			`/api/v1/backups/${backupShortId}/mirrors/${mirrorRepoShortId}/status`,
