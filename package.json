@@ -7,7 +7,6 @@
 	],
 	"type": "module",
 	"scripts": {
-		"postinstall": "lefthook install --reset-hooks-path",
 		"fmt": "oxfmt",
 		"fmt:check": "oxfmt --check",
 		"lint": "node ./node_modules/oxlint/bin/oxlint --type-aware --type-check",
