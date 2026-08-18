@@ -17,6 +17,7 @@ import { restic } from "~/server/core/restic";
 import { agentManager, type RestoreExecutionResult } from "~/server/modules/agents/agents-manager";
 import { createTestSession } from "~/test/helpers/auth";
 import { createTestBackupSchedule } from "~/test/helpers/backup";
+import { createTestVolume } from "~/test/helpers/volume";
 import { cache, cacheKeys } from "~/server/utils/cache";
 import { ResticError } from "@zerobyte/core/restic/server";
 import { repoMutex } from "~/server/core/repository-mutex";
@@ -603,9 +604,21 @@ describe("repositoriesService.restoreSnapshot", () => {
 		vi.restoreAllMocks();
 	});
 
-	const setupRestoreSnapshotScenario = async (paths = ["/var/lib/zerobyte/volumes/vol123/_data"]) => {
+	const setupRestoreSnapshotScenario = async (
+		paths = ["/var/lib/zerobyte/volumes/vol123/_data"],
+		volumeId?: number,
+	) => {
 		const organizationId = session.organizationId;
 		const repository = await createTestRepository(organizationId);
+		let tags: string[] | undefined;
+		if (volumeId !== undefined) {
+			const schedule = await createTestBackupSchedule({
+				organizationId,
+				repositoryId: repository.id,
+				volumeId,
+			});
+			tags = [schedule.shortId];
+		}
 
 		vi.spyOn(restic, "snapshots").mockReturnValue(
 			Effect.succeed([
@@ -614,6 +627,7 @@ describe("repositoriesService.restoreSnapshot", () => {
 					short_id: "snapshot-restore",
 					time: new Date().toISOString(),
 					paths,
+					tags,
 					hostname: "host",
 				},
 			]),
@@ -630,6 +644,80 @@ describe("repositoriesService.restoreSnapshot", () => {
 			restoreMock,
 		};
 	};
+
+	const setupReadOnlyRestoreSnapshotScenario = async () => {
+		const organizationId = session.organizationId;
+		const volume = await createTestVolume({
+			organizationId,
+			type: "nfs",
+			config: {
+				backend: "nfs",
+				server: "nfs.example.test",
+				exportPath: "/exports/backups",
+				port: 2049,
+				version: "4",
+				readOnly: true,
+			},
+		});
+		const sourcePath = `/var/lib/zerobyte/volumes/${volume.shortId}/_data`;
+		const { userId, repositoryShortId, restoreMock } = await setupRestoreSnapshotScenario([sourcePath], volume.id);
+		const snapshot = await withContext({ organizationId, userId }, () =>
+			repositoriesService.getSnapshotDetails(repositoryShortId, "snapshot-restore"),
+		);
+		expect(snapshot.paths).toEqual([sourcePath]);
+
+		return { organizationId, userId, repositoryShortId, restoreMock };
+	};
+
+	test("rejects original-location restore for a snapshot from a read-only volume", async () => {
+		const { organizationId, userId, repositoryShortId, restoreMock } = await setupReadOnlyRestoreSnapshotScenario();
+
+		await expect(
+			withContext({ organizationId, userId }, () =>
+				repositoriesService.restoreSnapshot(repositoryShortId, "snapshot-restore"),
+			),
+		).rejects.toThrow("read-only");
+
+		expect(restoreMock).not.toHaveBeenCalled();
+	});
+
+	test("rejects an explicit root target for a snapshot from a read-only volume", async () => {
+		const { organizationId, userId, repositoryShortId, restoreMock } = await setupReadOnlyRestoreSnapshotScenario();
+
+		await expect(
+			withContext({ organizationId, userId }, () =>
+				repositoriesService.restoreSnapshot(repositoryShortId, "snapshot-restore", {
+					targetPath: "/",
+				}),
+			),
+		).rejects.toThrow("read-only");
+
+		expect(restoreMock).not.toHaveBeenCalled();
+	});
+
+	test("allows a snapshot from a read-only volume to restore to a writable custom target", async () => {
+		const { organizationId, userId, repositoryShortId, restoreMock } = await setupReadOnlyRestoreSnapshotScenario();
+		const targetPath = await fs.mkdtemp(nodePath.join(process.cwd(), "restore-target-"));
+
+		try {
+			await withContext({ organizationId, userId }, () =>
+				repositoriesService.restoreSnapshot(repositoryShortId, "snapshot-restore", {
+					targetPath,
+				}),
+			);
+		} finally {
+			await fs.rm(targetPath, { recursive: true, force: true });
+		}
+
+		await waitForExpect(() => {
+			expect(restoreMock).toHaveBeenCalledWith(
+				"local",
+				expect.objectContaining({
+					payload: expect.objectContaining({ target: targetPath }),
+				}),
+			);
+		});
+	});
 
 	test("rejects protected targets even when the local agent is enabled", async () => {
 		const { organizationId, userId, repositoryShortId, restoreMock } = await setupRestoreSnapshotScenario();

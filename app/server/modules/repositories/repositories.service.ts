@@ -29,7 +29,7 @@ import type { DumpPathKind, UpdateRepositoryBody } from "./repositories.dto";
 import { findCommonAncestor } from "@zerobyte/core/utils";
 import { prepareSnapshotDump } from "./helpers/dump";
 import { emptyRepositoryStats, refreshStoredRepositoryStats } from "./helpers/repository-stats";
-import type { ShortId } from "~/server/utils/branded";
+import { asShortId, type ShortId } from "~/server/utils/branded";
 import { decryptRepositoryConfig, encryptRepositoryConfig } from "./repository-config-secrets";
 import { commands } from "./commands";
 import { getScheduleByIdOrShortId } from "../backups/helpers/backup-schedule-lookups";
@@ -99,6 +99,27 @@ const assertAllowedRestoreAgent = async (agentId: string, organizationId: string
 	const agent = await agentsService.getAgent(agentId);
 	if (!agent || agent.organizationId !== organizationId) {
 		throw new NotFoundError("Restore target agent not found");
+	}
+};
+
+const assertOriginalLocationRestoreAllowed = async (organizationId: string, snapshotTags?: string[] | null) => {
+	if (!snapshotTags?.length) {
+		return;
+	}
+
+	const scheduleShortIds = snapshotTags.map(asShortId);
+	const schedules = await db.query.backupSchedulesTable.findMany({
+		where: {
+			AND: [{ shortId: { in: scheduleShortIds } }, { organizationId }],
+		},
+		with: { volume: true },
+	});
+	const hasReadOnlySourceVolume = schedules.some((schedule) => schedule.volume.config.readOnly === true);
+
+	if (hasReadOnlySourceVolume) {
+		throw new BadRequestError(
+			"Original location restore is unavailable because the source volume is read-only. Restore to a custom location instead.",
+		);
 	}
 };
 
@@ -376,11 +397,16 @@ const restoreSnapshot = async (
 
 	const { targetAgentId, targetPath, ...restoreExecutionOptions } = options ?? {};
 	const target = targetPath || "/";
+	const restoresToOriginalLocation = nodePath.resolve(target) === "/";
 
 	const snapshot = await getSnapshotDetails(repository.shortId, snapshotId);
 	const hasNonPosixSnapshotPaths = snapshot.paths.some((path) => !path.startsWith("/"));
 
-	if (hasNonPosixSnapshotPaths && !targetPath) {
+	if (restoresToOriginalLocation) {
+		await assertOriginalLocationRestoreAllowed(organizationId, snapshot.tags);
+	}
+
+	if (hasNonPosixSnapshotPaths && restoresToOriginalLocation) {
 		throw new BadRequestError(
 			"Original location restore is unavailable for this snapshot. Restore it to a custom location instead.",
 		);

@@ -175,6 +175,39 @@ describe("backups security", () => {
 	});
 
 	describe("retention policy", () => {
+		test("normalizes an empty retention policy when creating a schedule", async () => {
+			const volume = await createTestVolume({ organizationId: session.organizationId });
+			const repository = await createTestRepository({ organizationId: session.organizationId });
+			const scheduleName = `Empty retention policy ${volume.shortId}`;
+
+			const createResponse = await app.request("/api/v1/backups", {
+				method: "POST",
+				headers: {
+					...session.headers,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					name: scheduleName,
+					volumeId: volume.shortId,
+					repositoryId: repository.shortId,
+					enabled: false,
+					cronExpression: "",
+					retentionPolicy: {},
+				}),
+			});
+
+			expect(createResponse.status).toBe(201);
+			const createdSchedule = await createResponse.json();
+			expect(createdSchedule.retentionPolicy).toBeNull();
+
+			const getResponse = await app.request(`/api/v1/backups/${createdSchedule.shortId}`, {
+				headers: session.headers,
+			});
+			expect(getResponse.status).toBe(200);
+			const persistedSchedule = await getResponse.json();
+			expect(persistedSchedule.retentionPolicy).toBeNull();
+		});
+
 		test("starts a retention task and rejects a duplicate active request", async () => {
 			const volume = await createTestVolume({ organizationId: session.organizationId });
 			const repository = await createTestRepository({ organizationId: session.organizationId });

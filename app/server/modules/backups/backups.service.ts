@@ -23,6 +23,14 @@ import type { ParsedTask } from "~/schemas/tasks";
 const BACKUP_TASK_RESOURCE_TYPE = "backup_schedule";
 const RESTART_BACKUP_ERROR = "Zerobyte was restarted during the last scheduled backup";
 
+const normalizeRetentionPolicy = (retentionPolicy: CreateBackupScheduleBody["retentionPolicy"]) => {
+	if (retentionPolicy !== undefined && Object.keys(retentionPolicy).length === 0) {
+		return null;
+	}
+
+	return retentionPolicy;
+};
+
 const listSchedules = async () => {
 	const organizationId = getOrganizationId();
 	const schedules = await db.query.backupSchedulesTable.findMany({
@@ -88,6 +96,7 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 	}
 
 	const nextBackupAt = data.cronExpression ? calculateNextRun(data.cronExpression) : null;
+	const retentionPolicy = normalizeRetentionPolicy(data.retentionPolicy);
 
 	const [newSchedule] = await db
 		.insert(backupSchedulesTable)
@@ -97,7 +106,7 @@ const createSchedule = async (data: CreateBackupScheduleBody) => {
 			repositoryId: repository.id,
 			enabled: data.enabled,
 			cronExpression: data.cronExpression,
-			retentionPolicy: data.retentionPolicy ?? null,
+			retentionPolicy: retentionPolicy ?? null,
 			excludePatterns: data.excludePatterns ?? [],
 			excludeIfPresent: data.excludeIfPresent ?? [],
 			includePaths: data.includePaths ?? [],
@@ -174,10 +183,7 @@ const updateSchedule = async (scheduleIdOrShortId: number | string, data: Update
 	}
 
 	const { retentionPolicy: requestedRetentionPolicy, ...updateData } = data;
-	let retentionPolicy: typeof requestedRetentionPolicy | null = requestedRetentionPolicy;
-	if (requestedRetentionPolicy !== undefined && Object.keys(requestedRetentionPolicy).length === 0) {
-		retentionPolicy = null;
-	}
+	const retentionPolicy = normalizeRetentionPolicy(requestedRetentionPolicy);
 
 	const updateValues = {
 		...updateData,
